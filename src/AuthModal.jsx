@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "./AuthContext";
 
 const T = {
@@ -42,10 +42,17 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Sync tab when defaultTab prop changes
-  if (tab !== defaultTab && !loading && !error) {
-    setTab(defaultTab);
-  }
+  // Reset form and apply defaultTab every time the modal opens
+  useEffect(() => {
+    if (open) {
+      setTab(defaultTab);
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      setError(null);
+      setLoading(false);
+    }
+  }, [open, defaultTab]);
 
   const reset = () => {
     setEmail(""); setPassword(""); setConfirmPassword("");
@@ -108,7 +115,7 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
       }}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <span style={{ fontSize: 17, fontWeight: 700, color: T.blue }}>InvestSim</span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: T.blue }}>WisiInvest</span>
           <button
             onClick={close}
             style={{ background: "transparent", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 2 }}
