@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAuth } from "./AuthContext";
+import AuthModal from "./AuthModal";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer,
@@ -676,15 +678,20 @@ const makePortfolio = () => {
 };
 
 export default function App() {
+  const { user } = useAuth();
   const [portfolios, setPortfolios] = useState([makePortfolio()]);
   const [selectedPf, setSelectedPf] = useState(1);
   const [exploreStock, setExploreStock] = useState(null);
   const [tab, setTab] = useState("search");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [softGateOpen, setSoftGateOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState("signup");
 
   const currentPf = portfolios.find((p) => p.id === selectedPf);
 
   const addHolding = (stock) => {
+    const isFirstHolding = portfolios.every((p) => p.holdings.length === 0);
     setPortfolios((pfs) =>
       pfs.map((p) =>
         p.id === selectedPf
@@ -699,6 +706,10 @@ export default function App() {
     );
     setTab("portfolio");
     setSidebarOpen(false);
+
+    if (isFirstHolding && !user && !localStorage.getItem("investsim_gate_shown")) {
+      setSoftGateOpen(true);
+    }
   };
 
   const updatePf = (updated) => setPortfolios((pfs) => pfs.map((p) => p.id === updated.id ? updated : p));
@@ -832,6 +843,71 @@ export default function App() {
           <PortfolioEditor portfolio={currentPf} onChange={updatePf} />
         )}
       </main>
+
+      {/* Soft gate modal */}
+      {softGateOpen && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div style={{
+            background: T.surface, borderRadius: 18,
+            padding: "32px 24px", width: "100%", maxWidth: 380,
+            boxShadow: "0 8px 40px rgba(0,0,0,0.14)", textAlign: "center",
+            fontFamily: "'Inter', system-ui, sans-serif",
+          }}>
+            <div style={{ fontSize: 36, marginBottom: 16 }}>💾</div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: "0 0 12px" }}>
+              Vuoi salvare i tuoi portafogli?
+            </h2>
+            <p style={{ fontSize: 14, color: T.textSecondary, lineHeight: 1.6, margin: "0 0 24px" }}>
+              Crea un account gratuito per ritrovare i tuoi portafogli ogni volta che torni.
+              Altrimenti verranno persi quando chiudi il browser.
+            </p>
+            <button
+              onClick={() => {
+                setSoftGateOpen(false);
+                setAuthModalTab("signup");
+                setAuthModalOpen(true);
+              }}
+              style={{
+                width: "100%", background: T.blue, color: "#fff",
+                border: "none", borderRadius: 10, padding: "13px 0",
+                fontWeight: 600, fontSize: 15, cursor: "pointer",
+                fontFamily: "inherit", marginBottom: 10,
+              }}
+            >
+              Crea account gratuito
+            </button>
+            <button
+              onClick={() => {
+                localStorage.setItem("investsim_gate_shown", "1");
+                setSoftGateOpen(false);
+              }}
+              style={{
+                width: "100%", background: "transparent", color: T.textSecondary,
+                border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 0",
+                fontWeight: 500, fontSize: 14, cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Continua senza account
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Auth modal */}
+      <AuthModal
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        defaultTab={authModalTab}
+        onSuccess={() => localStorage.setItem("investsim_gate_shown", "1")}
+      />
     </div>
   );
 }
