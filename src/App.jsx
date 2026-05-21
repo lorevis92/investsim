@@ -702,11 +702,13 @@ export default function App() {
 
   const loadPortfolios = async (uid) => {
     canSaveRef.current = false;
-    const { data } = await supabase
+    console.log("[investsim] loadPortfolios → uid:", uid);
+    const { data, error } = await supabase
       .from("portfolios")
       .select("*")
       .eq("user_id", uid)
       .order("created_at", { ascending: true });
+    console.log("[investsim] loadPortfolios ← data:", data, "error:", error);
     if (data?.length) {
       _id = data.length + 1;
       setPortfolios(data.map((row, i) => ({
@@ -717,11 +719,15 @@ export default function App() {
       })));
       setSelectedPf(1);
     }
-    setTimeout(() => { canSaveRef.current = true; }, 100);
+    setTimeout(() => {
+      canSaveRef.current = true;
+      console.log("[investsim] canSaveRef → true (save unlocked)");
+    }, 100);
   };
 
   // Load on login, reset on logout
   useEffect(() => {
+    console.log("[investsim] user effect → user:", user?.email ?? null);
     if (user) {
       loadPortfolios(user.id);
     } else {
@@ -734,17 +740,20 @@ export default function App() {
 
   // Auto-save (debounced 1 s) whenever portfolios change and user is logged in
   useEffect(() => {
+    console.log("[investsim] save effect → user:", user?.email ?? null, "| canSave:", canSaveRef.current, "| portfolios:", portfolios.length);
     if (!user || !canSaveRef.current) return;
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
+      console.log("[investsim] upsert start → portfolios to save:", portfolios.map((p) => ({ supabase_id: p.supabase_id, name: p.name, holdings: p.holdings.length })));
       for (const pf of portfolios) {
-        await supabase.from("portfolios").upsert({
+        const { data, error } = await supabase.from("portfolios").upsert({
           id: pf.supabase_id,
           user_id: user.id,
           name: pf.name,
           holdings: pf.holdings,
           updated_at: new Date().toISOString(),
         });
+        console.log("[investsim] upsert ←", pf.name, "| data:", data, "| error:", error);
       }
     }, 1000);
     return () => clearTimeout(saveTimerRef.current);
