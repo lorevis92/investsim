@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "./AuthContext";
 import AuthModal from "./AuthModal";
+import { supabase } from "./supabaseClient";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer,
@@ -674,11 +675,18 @@ function PortfolioEditor({ portfolio, onChange }) {
 let _id = 1;
 const makePortfolio = () => {
   const id = _id++;
-  return { id, name: id === 1 ? "Il mio portafoglio" : `Portafoglio ${id}`, holdings: [] };
+  return {
+    id,
+    supabase_id: crypto.randomUUID(),
+    name: id === 1 ? "Il mio portafoglio" : `Portafoglio ${id}`,
+    holdings: [],
+  };
 };
 
 export default function App() {
   const { user } = useAuth();
+
+  // useState first — effects below reference these setters
   const [portfolios, setPortfolios] = useState([makePortfolio()]);
   const [selectedPf, setSelectedPf] = useState(1);
   const [exploreStock, setExploreStock] = useState(null);
@@ -687,6 +695,61 @@ export default function App() {
   const [softGateOpen, setSoftGateOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState("signup");
+
+  // ── Supabase sync ──────────────────────────────────────────────────────────
+  const saveTimerRef = useRef(null);
+  const canSaveRef = useRef(false); // prevents saving while loading from Supabase
+
+  const loadPortfolios = async (uid) => {
+    canSaveRef.current = false;
+    const { data } = await supabase
+      .from("portfolios")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: true });
+    if (data?.length) {
+      _id = data.length + 1;
+      setPortfolios(data.map((row, i) => ({
+        id: i + 1,
+        supabase_id: row.id,
+        name: row.name,
+        holdings: row.holdings ?? [],
+      })));
+      setSelectedPf(1);
+    }
+    setTimeout(() => { canSaveRef.current = true; }, 100);
+  };
+
+  // Load on login, reset on logout
+  useEffect(() => {
+    if (user) {
+      loadPortfolios(user.id);
+    } else {
+      canSaveRef.current = false;
+      _id = 1;
+      setPortfolios([makePortfolio()]);
+      setSelectedPf(1);
+    }
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save (debounced 1 s) whenever portfolios change and user is logged in
+  useEffect(() => {
+    if (!user || !canSaveRef.current) return;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      for (const pf of portfolios) {
+        await supabase.from("portfolios").upsert({
+          id: pf.supabase_id,
+          user_id: user.id,
+          name: pf.name,
+          holdings: pf.holdings,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }, 1000);
+    return () => clearTimeout(saveTimerRef.current);
+  }, [portfolios, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── end Supabase sync ──────────────────────────────────────────────────────
 
   const currentPf = portfolios.find((p) => p.id === selectedPf);
 
@@ -720,7 +783,11 @@ export default function App() {
     setSelectedPf(pf.id);
   };
 
-  const deletePf = (id) => {
+  const deletePf = async (id) => {
+    const pf = portfolios.find((p) => p.id === id);
+    if (user && pf?.supabase_id) {
+      await supabase.from("portfolios").delete().eq("id", pf.supabase_id);
+    }
     const remaining = portfolios.filter((p) => p.id !== id);
     setPortfolios(remaining.length ? remaining : [makePortfolio()]);
     setSelectedPf(remaining[0]?.id || 1);
