@@ -59,35 +59,13 @@ const MILESTONES = [10, 15, 20, 25, 30];
 
 // ─── AI FETCH ─────────────────────────────────────────────────────────────────
 async function fetchStockInfo(query) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      system: `Sei un assistente finanziario esperto. L'utente cerca informazioni su un titolo azionario, ETF o indice per simulare un investimento DCA a lungo termine.
-Rispondi SOLO con un oggetto JSON valido, nessun testo aggiuntivo, nessun markdown, nessuna backtick.
-Il JSON deve avere questa struttura:
-{
-  "symbol": "TICKER",
-  "name": "Nome completo",
-  "type": "ETF|Stock|Index",
-  "currentPrice": 123.45,
-  "currency": "USD",
-  "estimatedAnnualReturn": 15.0,
-  "returnBasis": "Breve spiegazione del perché questo rendimento stimato (1-2 frasi)",
-  "description": "Descrizione breve del titolo (2-3 frasi)",
-  "risk": "Low|Medium|High|Very High",
-  "sector": "Technology|Finance|etc"
-}
-Per estimatedAnnualReturn usa rendimenti storici realistici a lungo termine (10-20+ anni).
-Per titoli/ETF famosi usa dati reali. Per richieste vaghe o non trovate, metti estimatedAnnualReturn: null e symbol: "NOT_FOUND".`,
-      messages: [{ role: "user", content: `Cerca: ${query}` }],
-    }),
+    body: JSON.stringify({ query }),
   });
-  const data = await res.json();
-  const text = data.content?.find((b) => b.type === "text")?.text || "{}";
-  return JSON.parse(text.replace(/```json|```/g, "").trim());
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
 }
 
 // ─── COMPONENTS ───────────────────────────────────────────────────────────────
