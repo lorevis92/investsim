@@ -8,13 +8,18 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // 1. Legge la sessione esistente (es. refresh della pagina con sessione attiva)
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('[investsim] getSession →', 'user:', session?.user?.email ?? null, '| error:', error)
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // 2. Ascolta tutti i cambiamenti di stato auth (login, logout, token refresh…)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[investsim] onAuthStateChange →', 'event:', event, '| user:', session?.user?.email ?? null)
       setUser(session?.user ?? null);
+      // setLoading(false) è già gestito da getSession; qui non serve
     });
 
     return () => subscription.unsubscribe();
