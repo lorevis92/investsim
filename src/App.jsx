@@ -684,7 +684,7 @@ const makePortfolio = () => {
 };
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   // useState first — effects below reference these setters
   const [portfolios, setPortfolios] = useState([makePortfolio()]);
@@ -876,7 +876,7 @@ export default function App() {
         >☰</button>
 
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: T.blue, flexShrink: 0 }}>InvestSim</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: T.blue, flexShrink: 0 }}>WisiInvest</span>
           <span style={{
             fontSize: 11, color: T.blue, background: T.blueLight,
             border: `1px solid ${T.blueBorder}`, borderRadius: 6,
@@ -886,7 +886,31 @@ export default function App() {
           </span>
         </div>
 
-        <span style={{ fontSize: 11, color: T.textMuted, flexShrink: 0 }}>Solo simulazione</span>
+        {user ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 12, color: T.textSecondary, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {user.email}
+            </span>
+            <button
+              onClick={logout}
+              style={{
+                background: "transparent", border: `1px solid ${T.border}`,
+                borderRadius: 8, color: T.textSecondary,
+                fontSize: 12, fontWeight: 500, padding: "5px 10px",
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >Esci</button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setAuthModalTab("login"); setAuthModalOpen(true); }}
+            style={{
+              background: T.blue, border: "none", borderRadius: 8,
+              color: "#fff", fontSize: 13, fontWeight: 600,
+              padding: "7px 14px", cursor: "pointer", fontFamily: "inherit", flexShrink: 0,
+            }}
+          >Accedi</button>
+        )}
       </header>
 
       {/* Main */}
