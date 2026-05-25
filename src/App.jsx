@@ -302,9 +302,6 @@ function SearchPanel({ onAdd, onExplore }) {
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.5 }}>
-              {result.returnBasis}
-            </div>
           </div>
 
           {/* Monthly slider */}
