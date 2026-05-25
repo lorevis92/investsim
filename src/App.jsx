@@ -519,7 +519,7 @@ function PortfolioCard({ portfolio, onSelect, onDelete, selected }) {
 }
 
 // ─── PORTFOLIO EDITOR ─────────────────────────────────────────────────────────
-function PortfolioEditor({ portfolio, onChange }) {
+function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
   const [mode, setMode] = useState("amount");
   const [scenarioMode, setScenarioMode] = useState("base");
   const totalMonthly = portfolio.holdings.reduce((s, h) => s + h.monthly, 0);
@@ -590,10 +590,18 @@ function PortfolioEditor({ portfolio, onChange }) {
           border: `1.5px dashed ${T.border}`,
         }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>📈</div>
-          <div style={{ fontWeight: 600, color: T.text, marginBottom: 8 }}>Il portafoglio è vuoto</div>
-          <div style={{ fontSize: 14, color: T.textSecondary }}>
-            Cerca un titolo qui sopra e aggiungilo a questo portafoglio.
+          <div style={{ fontWeight: 600, color: T.text, marginBottom: 8 }}>Nessun titolo ancora</div>
+          <div style={{ fontSize: 14, color: T.textSecondary, marginBottom: 20 }}>
+            Cerca un titolo e aggiungilo a questo portafoglio.
           </div>
+          <button
+            onClick={onGoToSearch}
+            style={{
+              background: T.blue, color: "#fff", border: "none",
+              borderRadius: 10, padding: "11px 22px",
+              fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >Aggiungi il tuo primo titolo</button>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
@@ -902,6 +910,7 @@ export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState("signup");
   const [addModal, setAddModal] = useState({ open: false, stock: null });
+  const [activePage, setActivePage] = useState("search");
 
   // ── Supabase sync ──────────────────────────────────────────────────────────
   const saveTimerRef = useRef(null);
@@ -1012,6 +1021,7 @@ export default function App() {
   const selectPf = (id) => {
     setSelectedPf(id);
     setSidebarOpen(false);
+    setActivePage("portfolio");
   };
 
   return (
@@ -1081,15 +1091,28 @@ export default function App() {
           }}
         >☰</button>
 
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <span style={{ fontSize: 16, fontWeight: 700, color: T.blue, flexShrink: 0 }}>WisiInvest</span>
-          <span style={{
-            fontSize: 11, color: T.blue, background: T.blueLight,
-            border: `1px solid ${T.blueBorder}`, borderRadius: 6,
-            padding: "2px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          <div style={{
+            display: "flex", gap: 2, background: T.bg,
+            borderRadius: 10, padding: 3, border: `1px solid ${T.border}`, flexShrink: 0,
           }}>
-            {currentPf?.name || "Portafoglio"}
-          </span>
+            {[["search", "Cerca"], ["portfolio", "Portafoglio"]].map(([page, label]) => (
+              <button
+                key={page}
+                onClick={() => setActivePage(page)}
+                style={{
+                  background: activePage === page ? T.surface : "transparent",
+                  color: activePage === page ? T.text : T.textSecondary,
+                  border: "none", borderRadius: 7, padding: "5px 12px",
+                  fontSize: 13, fontWeight: activePage === page ? 600 : 400,
+                  cursor: "pointer", fontFamily: "inherit",
+                  boxShadow: activePage === page ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  transition: "background .15s, color .15s",
+                }}
+              >{label}</button>
+            ))}
+          </div>
         </div>
 
         {user ? (
@@ -1121,20 +1144,37 @@ export default function App() {
 
       {/* Main */}
       <main style={{ padding: "16px", maxWidth: 720, margin: "0 auto" }}>
-        <SearchPanel
-          onAdd={(stock) => setAddModal({ open: true, stock })}
-          onExplore={(s) => setExploreStock(s)}
-        />
-
-        {exploreStock && (
-          <div style={{ marginTop: 16 }}>
-            <ExplorePanel stock={exploreStock} onClose={() => setExploreStock(null)} />
-          </div>
+        {activePage === "search" && (
+          <>
+            <SearchPanel
+              onAdd={(stock) => setAddModal({ open: true, stock })}
+              onExplore={(s) => setExploreStock(s)}
+            />
+            {exploreStock && (
+              <div style={{ marginTop: 16 }}>
+                <ExplorePanel stock={exploreStock} onClose={() => setExploreStock(null)} />
+              </div>
+            )}
+          </>
         )}
 
-        {currentPf && (
-          <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${T.border}` }}>
-            <PortfolioEditor portfolio={currentPf} onChange={updatePf} />
+        {activePage === "portfolio" && currentPf && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+              <button
+                onClick={() => setActivePage("search")}
+                style={{
+                  background: T.blue, color: "#fff", border: "none",
+                  borderRadius: 10, padding: "9px 18px",
+                  fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >+ Aggiungi titolo</button>
+            </div>
+            <PortfolioEditor
+              portfolio={currentPf}
+              onChange={updatePf}
+              onGoToSearch={() => setActivePage("search")}
+            />
           </div>
         )}
       </main>
