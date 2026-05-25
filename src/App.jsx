@@ -316,7 +316,7 @@ function SearchPanel({ onAdd, onExplore }) {
 
 // ─── EXPLORE PANEL ────────────────────────────────────────────────────────────
 function ExplorePanel({ stock, onClose }) {
-  const data = buildChartData([{ ...stock, monthly: 500, color: T.blue }], 30);
+  const data = buildChartData([{ ...stock, monthly: 500, color: T.blue, rate: stock.estimatedAnnualReturn }], 30);
   return (
     <div style={{
       background: T.surface, border: `1px solid ${T.border}`,
