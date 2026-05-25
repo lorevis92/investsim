@@ -19,12 +19,19 @@ Il JSON deve avere questa struttura:
   "returnBasis": "Spiegazione della metodologia usata (2-3 frasi)",
   "description": "Descrizione breve del titolo (2-3 frasi)",
   "risk": "Low|Medium|High|Very High",
-  "sector": "Technology|Finance|etc"
+  "sector": "Technology|Finance|etc",
+  "explanation": {
+    "historical": "Spiegazione semplice dei dati storici usati — es: Negli ultimi 20 anni questo titolo ha reso in media X% all'anno",
+    "currentContext": "Contesto attuale del titolo — valutazione, settore, momento di mercato — in 2-3 frasi semplici",
+    "riskFactors": "I principali fattori che potrebbero far andare meglio o peggio rispetto alle aspettative — in 2-3 frasi semplici",
+    "methodology": "Come abbiamo costruito i tre scenari pessimistico, base, ottimistico — 1-2 frasi"
+  }
 }
 Per i tre scenari usa benchmark storici di lungo periodo (20-30 anni):
 - pessimistic: media storica 20-30 anni meno 1.5 deviazioni standard, o rendimento minimo per asset class
 - base: media storica 20-30 anni aggiustata per valutazione attuale e mean reversion
 - optimistic: media storica 20-30 anni pura
+Per il campo explanation usa un linguaggio semplice e accessibile a chi non investe — niente gergo finanziario, spiega come lo spiegheresti a un amico.
 Per titoli/ETF famosi usa dati reali. Per richieste vaghe o non trovate, metti returns: null e symbol: "NOT_FOUND".`;
 
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -53,6 +60,7 @@ function mapToApiShape(row) {
     returnBasis: row.return_basis,
     currentPrice: row.current_price,
     currency: row.currency,
+    explanation: row.explanation ?? null,
   };
 }
 
@@ -105,7 +113,7 @@ export default async function handler(request) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-5',
-      max_tokens: 1000,
+      max_tokens: 1800,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: `Cerca: ${query}` }],
     }),
@@ -147,6 +155,7 @@ export default async function handler(request) {
         return_basis: result.returnBasis,
         current_price: result.currentPrice ?? null,
         currency: result.currency ?? null,
+        explanation: result.explanation ?? null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'symbol' }

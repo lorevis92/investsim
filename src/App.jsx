@@ -103,6 +103,57 @@ function RiskBadge({ risk }) {
   );
 }
 
+// ─── EXPLANATION SECTION ──────────────────────────────────────────────────────
+function ExplanationSection({ explanation }) {
+  const [open, setOpen] = useState(false);
+  if (!explanation) return null;
+
+  const items = [
+    { icon: "📈", label: "Dati storici",      text: explanation.historical },
+    { icon: "🔍", label: "Contesto attuale",  text: explanation.currentContext },
+    { icon: "⚠️", label: "Fattori di rischio", text: explanation.riskFactors },
+    { icon: "🧮", label: "Metodologia",       text: explanation.methodology },
+  ];
+
+  return (
+    <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 20 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%", background: "none", border: "none", cursor: "pointer",
+          padding: "14px 0", display: "flex", justifyContent: "space-between",
+          alignItems: "center", fontFamily: "inherit",
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>
+          Come abbiamo calcolato questo
+        </span>
+        <span style={{ color: T.textMuted, fontSize: 13, fontWeight: 500 }}>
+          {open ? "Chiudi ▲" : "Mostra ▼"}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 16 }}>
+          {items.map(({ icon, label, text }) => (
+            <div key={label} style={{
+              background: T.bg, borderRadius: 10, padding: "12px 14px",
+              border: `1px solid ${T.border}`,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 5 }}>
+                {icon} {label}
+              </div>
+              <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.65 }}>
+                {text}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SEARCH PANEL ─────────────────────────────────────────────────────────────
 function SearchPanel({ onAdd, onExplore }) {
   const [query, setQuery] = useState("");
@@ -296,6 +347,8 @@ function SearchPanel({ onAdd, onExplore }) {
             })}
           </div>
 
+          <ExplanationSection explanation={result.explanation} />
+
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
@@ -420,6 +473,8 @@ function ExplorePanel({ stock, onClose }) {
           );
         })}
       </div>
+
+      <ExplanationSection explanation={stock.explanation} />
     </div>
   );
 }
