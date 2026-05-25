@@ -116,7 +116,7 @@ function SearchPanel({ onAdd, onExplore }) {
     setLoading(true); setResult(null); setError(null);
     try {
       const data = await fetchStockInfo(query);
-      if (data.symbol === "NOT_FOUND" || !data.estimatedAnnualReturn) {
+      if (data.symbol === "NOT_FOUND" || !data.returns?.base) {
         setError("Non abbiamo trovato questo titolo. Prova con un nome diverso, ad esempio: Apple, S&P 500, Oro.");
       } else {
         setResult(data);
@@ -229,18 +229,29 @@ function SearchPanel({ onAdd, onExplore }) {
             {result.description}
           </p>
 
-          {/* Return highlight */}
+          {/* Return scenarios */}
           <div style={{
-            background: T.greenLight, border: `1px solid ${T.greenBorder}`,
+            background: T.bg, border: `1px solid ${T.border}`,
             borderRadius: 12, padding: "14px 18px", marginBottom: 20,
           }}>
-            <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 4 }}>
-              Rendimento medio annuo stimato (dati storici)
+            <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 10 }}>
+              Scenari di rendimento annuo (benchmark storici 20-30 anni)
             </div>
-            <div style={{ fontSize: 30, fontWeight: 700, color: T.green, lineHeight: 1 }}>
-              +{result.estimatedAnnualReturn}%
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
+              {[
+                { key: "pessimistic", label: "Pessimistico", color: T.red, bg: T.redLight, border: "#FECACA" },
+                { key: "base", label: "Base", color: T.blue, bg: T.blueLight, border: T.blueBorder },
+                { key: "optimistic", label: "Ottimistico", color: T.green, bg: T.greenLight, border: T.greenBorder },
+              ].map(({ key, label, color, bg, border }) => (
+                <div key={key} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
+                  <div style={{ fontSize: 11, color, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }}>
+                    +{result.returns[key]}%
+                  </div>
+                </div>
+              ))}
             </div>
-            <div style={{ fontSize: 13, color: T.textSecondary, marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.5 }}>
               {result.returnBasis}
             </div>
           </div>
@@ -265,10 +276,10 @@ function SearchPanel({ onAdd, onExplore }) {
             </div>
           </div>
 
-          {/* Quick projections */}
+          {/* Quick projections — scenario base */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 20 }}>
             {[10, 20, 30].map((y) => {
-              const fv = calcDCA(monthly, result.estimatedAnnualReturn / 100, y);
+              const fv = calcDCA(monthly, result.returns.base / 100, y);
               const inv = monthly * 12 * y;
               return (
                 <div key={y} style={{
@@ -288,7 +299,7 @@ function SearchPanel({ onAdd, onExplore }) {
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
-              onClick={() => onAdd({ ...result, monthly, color: CHART_COLORS[Math.floor(Math.random() * CHART_COLORS.length)], rate: result.estimatedAnnualReturn })}
+              onClick={() => onAdd({ ...result, monthly, color: CHART_COLORS[Math.floor(Math.random() * CHART_COLORS.length)], rate: result.returns.base })}
               style={{
                 flex: 1, minWidth: 140, background: T.blue, color: "#fff",
                 border: "none", borderRadius: 10, padding: "13px 16px",
@@ -314,9 +325,24 @@ function SearchPanel({ onAdd, onExplore }) {
   );
 }
 
+const SCENARIO_META = [
+  { key: "pessimistic", label: "Pessimistico", color: T.red },
+  { key: "base",        label: "Base",         color: T.blue },
+  { key: "optimistic",  label: "Ottimistico",  color: T.green },
+];
+
 // ─── EXPLORE PANEL ────────────────────────────────────────────────────────────
 function ExplorePanel({ stock, onClose }) {
-  const data = buildChartData([{ ...stock, monthly: 500, color: T.blue, rate: stock.estimatedAnnualReturn }], 30);
+  const returns = stock.returns ?? { pessimistic: stock.rate, base: stock.rate, optimistic: stock.rate };
+
+  const data = Array.from({ length: 31 }, (_, y) => ({
+    year: y,
+    invested: 500 * 12 * y,
+    pessimistic: Math.round(calcDCA(500, returns.pessimistic / 100, y)),
+    base:        Math.round(calcDCA(500, returns.base        / 100, y)),
+    optimistic:  Math.round(calcDCA(500, returns.optimistic  / 100, y)),
+  }));
+
   return (
     <div style={{
       background: T.surface, border: `1px solid ${T.border}`,
@@ -338,36 +364,58 @@ function ExplorePanel({ stock, onClose }) {
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <defs>
-            <linearGradient id="eg" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={T.blue} stopOpacity={0.15} />
-              <stop offset="95%" stopColor={T.blue} stopOpacity={0} />
-            </linearGradient>
+            {SCENARIO_META.map(({ key, color }) => (
+              <linearGradient key={key} id={`eg-${key}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={color} stopOpacity={0.12} />
+                <stop offset="95%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            ))}
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
           <XAxis dataKey="year" stroke={T.textMuted} tick={{ fontSize: 11, fill: T.textMuted }} tickFormatter={(v) => `${v}a`} />
           <YAxis stroke={T.textMuted} tick={{ fontSize: 11, fill: T.textMuted }} tickFormatter={fmtK} />
           <Tooltip
-            contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 13 }}
-            formatter={(v, name) => [fmtCHF(v), name === "invested" ? "Versato" : stock.symbol]}
+            contentStyle={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 12 }}
+            formatter={(v, name) => {
+              const s = SCENARIO_META.find((m) => m.key === name);
+              return [fmtCHF(v), s ? s.label : name === "invested" ? "Versato" : name];
+            }}
             labelFormatter={(l) => `Anno ${l}`}
           />
-          <Area type="monotone" dataKey={stock.symbol} stroke={T.blue} fill="url(#eg)" strokeWidth={2.5} dot={false} />
-          <Area type="monotone" dataKey="invested" stroke={T.textMuted} fill="transparent" strokeDasharray="5 3" strokeWidth={1.5} dot={false} name="invested" />
+          <Legend wrapperStyle={{ fontSize: 11, color: T.textSecondary }}
+            formatter={(v) => {
+              const s = SCENARIO_META.find((m) => m.key === v);
+              return s ? s.label : "Versato";
+            }}
+          />
+          <Area type="monotone" dataKey="invested" stroke={T.textMuted} fill="transparent" strokeDasharray="5 3" strokeWidth={1.5} dot={false} />
+          {SCENARIO_META.map(({ key, color }) => (
+            <Area key={key} type="monotone" dataKey={key} stroke={color} fill={`url(#eg-${key})`} strokeWidth={2} dot={false} />
+          ))}
         </AreaChart>
       </ResponsiveContainer>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6, marginTop: 16 }}>
         {MILESTONES.map((y) => {
-          const fv = calcDCA(500, stock.estimatedAnnualReturn / 100, y);
           const inv = 500 * 12 * y;
           return (
             <div key={y} style={{
-              background: T.bg, borderRadius: 8, padding: "10px 6px",
+              background: T.bg, borderRadius: 8, padding: "8px 4px",
               textAlign: "center", border: `1px solid ${T.border}`,
             }}>
-              <div style={{ fontSize: 11, color: T.textMuted }}>{y} anni</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: T.text, marginTop: 4 }}>{fmtK(fv)}</div>
-              <div style={{ fontSize: 10, color: T.green }}>×{(fv / inv).toFixed(1)}</div>
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 4 }}>{y} anni</div>
+              {SCENARIO_META.map(({ key, color }) => {
+                const fv = Math.round(calcDCA(500, returns[key] / 100, y));
+                return (
+                  <div key={key} style={{ marginBottom: 3 }}>
+                    <div style={{ fontSize: 9, color, fontWeight: 600, lineHeight: 1.2 }}>
+                      {key === "pessimistic" ? "Pess." : key === "base" ? "Base" : "Ott."}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{fmtK(fv)}</div>
+                    <div style={{ fontSize: 9, color }}>{(fv / inv).toFixed(1)}×</div>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -421,7 +469,10 @@ function PortfolioCard({ portfolio, onSelect, onDelete, selected }) {
 // ─── PORTFOLIO EDITOR ─────────────────────────────────────────────────────────
 function PortfolioEditor({ portfolio, onChange }) {
   const [mode, setMode] = useState("amount");
+  const [scenarioMode, setScenarioMode] = useState("base");
   const totalMonthly = portfolio.holdings.reduce((s, h) => s + h.monthly, 0);
+
+  const scenarioRate = (h) => h.returns?.[scenarioMode] ?? h.rate;
 
   const updateHolding = (symbol, field, val) =>
     onChange({ ...portfolio, holdings: portfolio.holdings.map((h) => h.symbol === symbol ? { ...h, [field]: val } : h) });
@@ -437,7 +488,7 @@ function PortfolioEditor({ portfolio, onChange }) {
   const setFromPercent = (totalMonthlyCHF) =>
     onChange({ ...portfolio, holdings: portfolio.holdings.map((h) => ({ ...h, monthly: Math.round((h._pct / 100) * totalMonthlyCHF) })) });
 
-  const chartData = buildChartData(portfolio.holdings);
+  const chartData = buildChartData(portfolio.holdings.map((h) => ({ ...h, rate: scenarioRate(h) })));
 
   return (
     <div>
@@ -505,8 +556,12 @@ function PortfolioEditor({ portfolio, onChange }) {
                     <span style={{ fontWeight: 700, fontSize: 16, color: h.color }}>{h.symbol}</span>
                     <span style={{ fontSize: 13, color: T.textSecondary }}>{h.name?.substring(0, 35)}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: T.green, marginTop: 3 }}>
-                    Rendimento storico stimato: +{h.rate}% annuo
+                  <div style={{ fontSize: 12, marginTop: 3, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ color: T.red }}>Pess. +{h.returns?.pessimistic ?? h.rate}%</span>
+                    <span style={{ color: T.textMuted }}>·</span>
+                    <span style={{ color: T.blue }}>Base +{h.returns?.base ?? h.rate}%</span>
+                    <span style={{ color: T.textMuted }}>·</span>
+                    <span style={{ color: T.green }}>Ott. +{h.returns?.optimistic ?? h.rate}%</span>
                   </div>
                 </div>
                 <button
@@ -576,8 +631,25 @@ function PortfolioEditor({ portfolio, onChange }) {
       {/* Chart + table */}
       {portfolio.holdings.length > 0 && (
         <>
-          <div style={{ fontWeight: 600, fontSize: 16, color: T.text, marginBottom: 4 }}>
-            Come potrebbe crescere il tuo portafoglio
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+            <div style={{ fontWeight: 600, fontSize: 16, color: T.text }}>
+              Come potrebbe crescere il tuo portafoglio
+            </div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {SCENARIO_META.map(({ key, label, color }) => (
+                <button
+                  key={key}
+                  onClick={() => setScenarioMode(key)}
+                  style={{
+                    background: scenarioMode === key ? color : T.surface,
+                    color: scenarioMode === key ? "#fff" : T.textSecondary,
+                    border: `1.5px solid ${scenarioMode === key ? color : T.border}`,
+                    borderRadius: 8, padding: "5px 10px",
+                    fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >{label}</button>
+              ))}
+            </div>
           </div>
           <p style={{ fontSize: 13, color: T.textSecondary, marginBottom: 16, lineHeight: 1.5 }}>
             Simulazione basata sui rendimenti storici. I risultati passati non garantiscono quelli futuri.
@@ -637,7 +709,7 @@ function PortfolioEditor({ portfolio, onChange }) {
                     <td style={{ padding: "10px 14px", fontWeight: 600, color: h.color }}>{h.symbol}</td>
                     {MILESTONES.map((y) => (
                       <td key={y} style={{ textAlign: "right", padding: "10px 14px", color: T.text }}>
-                        {fmtCHF(calcDCA(h.monthly, h.rate / 100, y))}
+                        {fmtCHF(calcDCA(h.monthly, scenarioRate(h) / 100, y))}
                       </td>
                     ))}
                   </tr>
@@ -646,7 +718,7 @@ function PortfolioEditor({ portfolio, onChange }) {
                   <td style={{ padding: "10px 14px", fontWeight: 700, color: T.blue }}>Totale</td>
                   {MILESTONES.map((y) => (
                     <td key={y} style={{ textAlign: "right", padding: "10px 14px", fontWeight: 700, color: T.blue }}>
-                      {fmtCHF(portfolio.holdings.reduce((s, h) => s + calcDCA(h.monthly, h.rate / 100, y), 0))}
+                      {fmtCHF(portfolio.holdings.reduce((s, h) => s + calcDCA(h.monthly, scenarioRate(h) / 100, y), 0))}
                     </td>
                   ))}
                 </tr>
@@ -654,7 +726,7 @@ function PortfolioEditor({ portfolio, onChange }) {
                   <td style={{ padding: "6px 14px", fontSize: 12, color: T.textMuted }}>di cui versato</td>
                   {MILESTONES.map((y) => {
                     const inv = totalMonthly * 12 * y;
-                    const tot = portfolio.holdings.reduce((s, h) => s + calcDCA(h.monthly, h.rate / 100, y), 0);
+                    const tot = portfolio.holdings.reduce((s, h) => s + calcDCA(h.monthly, scenarioRate(h) / 100, y), 0);
                     return (
                       <td key={y} style={{ textAlign: "right", padding: "6px 14px", fontSize: 12, color: T.textSecondary }}>
                         {fmtCHF(inv)} · ×{(tot / (inv || 1)).toFixed(1)}

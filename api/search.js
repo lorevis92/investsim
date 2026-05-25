@@ -11,14 +11,21 @@ Il JSON deve avere questa struttura:
   "type": "ETF|Stock|Index",
   "currentPrice": 123.45,
   "currency": "USD",
-  "estimatedAnnualReturn": 15.0,
-  "returnBasis": "Breve spiegazione del perché questo rendimento stimato (1-2 frasi)",
+  "returns": {
+    "pessimistic": 5.0,
+    "base": 10.0,
+    "optimistic": 15.0
+  },
+  "returnBasis": "Spiegazione della metodologia usata (2-3 frasi)",
   "description": "Descrizione breve del titolo (2-3 frasi)",
   "risk": "Low|Medium|High|Very High",
   "sector": "Technology|Finance|etc"
 }
-Per estimatedAnnualReturn usa rendimenti storici realistici a lungo termine (10-20+ anni).
-Per titoli/ETF famosi usa dati reali. Per richieste vaghe o non trovate, metti estimatedAnnualReturn: null e symbol: "NOT_FOUND".`;
+Per i tre scenari usa benchmark storici di lungo periodo (20-30 anni):
+- pessimistic: media storica 20-30 anni meno 1.5 deviazioni standard, o rendimento minimo per asset class
+- base: media storica 20-30 anni aggiustata per valutazione attuale e mean reversion
+- optimistic: media storica 20-30 anni pura
+Per titoli/ETF famosi usa dati reali. Per richieste vaghe o non trovate, metti returns: null e symbol: "NOT_FOUND".`;
 
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -35,7 +42,11 @@ function mapToApiShape(row) {
     symbol: row.symbol,
     name: row.name,
     type: row.type,
-    estimatedAnnualReturn: row.estimated_annual_return,
+    returns: {
+      pessimistic: row.return_pessimistic,
+      base: row.return_base,
+      optimistic: row.return_optimistic,
+    },
     risk: row.risk,
     sector: row.sector,
     description: row.description,
@@ -121,13 +132,15 @@ export default async function handler(request) {
   }
 
   // Persist to DB if valid result
-  if (result.symbol && result.symbol !== 'NOT_FOUND' && result.estimatedAnnualReturn != null) {
+  if (result.symbol && result.symbol !== 'NOT_FOUND' && result.returns?.base != null) {
     await supabase.from('stocks').upsert(
       {
         symbol: result.symbol,
         name: result.name,
         type: result.type,
-        estimated_annual_return: result.estimatedAnnualReturn,
+        return_pessimistic: result.returns.pessimistic,
+        return_base: result.returns.base,
+        return_optimistic: result.returns.optimistic,
         risk: result.risk,
         sector: result.sector,
         description: result.description,
