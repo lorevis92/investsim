@@ -489,7 +489,7 @@ function PortfolioEditor({ portfolio, onChange }) {
           <div style={{ fontSize: 36, marginBottom: 12 }}>📈</div>
           <div style={{ fontWeight: 600, color: T.text, marginBottom: 8 }}>Il portafoglio è vuoto</div>
           <div style={{ fontSize: 14, color: T.textSecondary }}>
-            Vai su "Cerca titoli" e aggiungi qualcosa per iniziare.
+            Cerca un titolo qui sopra e aggiungilo a questo portafoglio.
           </div>
         </div>
       ) : (
@@ -671,6 +671,89 @@ function PortfolioEditor({ portfolio, onChange }) {
   );
 }
 
+// ─── ADD TO PORTFOLIO MODAL ───────────────────────────────────────────────────
+function AddToPortfolioModal({ stock, portfolios, onConfirm, onAddNew, onClose }) {
+  const [selected, setSelected] = useState(portfolios[0]?.id ?? null);
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 100,
+        background: "rgba(0,0,0,0.4)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{
+        background: T.surface, borderRadius: 18,
+        padding: "24px", width: "100%", maxWidth: 380,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.14)",
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>Aggiungi al portafoglio</div>
+            <div style={{ fontSize: 13, color: T.textSecondary, marginTop: 3 }}>
+              {stock.symbol} · {stock.name}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 2, flexShrink: 0 }}
+          >×</button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          {portfolios.map((pf) => (
+            <button
+              key={pf.id}
+              onClick={() => setSelected(pf.id)}
+              style={{
+                background: selected === pf.id ? T.blueLight : T.bg,
+                border: `1.5px solid ${selected === pf.id ? T.blue : T.border}`,
+                borderRadius: 10, padding: "12px 14px",
+                textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+                transition: "border-color .12s",
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{pf.name}</div>
+              <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
+                {pf.holdings.length === 0
+                  ? "Nessun titolo"
+                  : `${pf.holdings.length} ${pf.holdings.length === 1 ? "titolo" : "titoli"}`}
+              </div>
+            </button>
+          ))}
+          <button
+            onClick={onAddNew}
+            style={{
+              background: "transparent", border: `1.5px dashed ${T.border}`,
+              borderRadius: 10, padding: "12px 14px",
+              textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+              color: T.textSecondary, fontSize: 14, fontWeight: 500,
+            }}
+          >
+            + Crea nuovo portafoglio
+          </button>
+        </div>
+
+        <button
+          onClick={() => onConfirm(selected)}
+          disabled={selected === null}
+          style={{
+            width: "100%", background: T.blue, color: "#fff",
+            border: "none", borderRadius: 10, padding: "13px 0",
+            fontWeight: 600, fontSize: 15, cursor: "pointer", fontFamily: "inherit",
+          }}
+        >
+          Aggiungi
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 let _id = 1;
 const makePortfolio = () => {
@@ -690,11 +773,11 @@ export default function App() {
   const [portfolios, setPortfolios] = useState([makePortfolio()]);
   const [selectedPf, setSelectedPf] = useState(1);
   const [exploreStock, setExploreStock] = useState(null);
-  const [tab, setTab] = useState("search");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [softGateOpen, setSoftGateOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState("signup");
+  const [addModal, setAddModal] = useState({ open: false, stock: null });
 
   // ── Supabase sync ──────────────────────────────────────────────────────────
   const saveTimerRef = useRef(null);
@@ -762,11 +845,12 @@ export default function App() {
 
   const currentPf = portfolios.find((p) => p.id === selectedPf);
 
-  const addHolding = (stock) => {
+  const addHolding = (stock, portfolioId) => {
+    const targetId = portfolioId ?? selectedPf;
     const isFirstHolding = portfolios.every((p) => p.holdings.length === 0);
     setPortfolios((pfs) =>
       pfs.map((p) =>
-        p.id === selectedPf
+        p.id === targetId
           ? {
               ...p,
               holdings: p.holdings.find((h) => h.symbol === stock.symbol)
@@ -776,9 +860,8 @@ export default function App() {
           : p
       )
     );
-    setTab("portfolio");
+    setSelectedPf(targetId);
     setSidebarOpen(false);
-
     if (isFirstHolding && !user && !localStorage.getItem("investsim_gate_shown")) {
       setSoftGateOpen(true);
     }
@@ -805,7 +888,6 @@ export default function App() {
   const selectPf = (id) => {
     setSelectedPf(id);
     setSidebarOpen(false);
-    setTab("portfolio");
   };
 
   return (
@@ -915,34 +997,47 @@ export default function App() {
 
       {/* Main */}
       <main style={{ padding: "16px", maxWidth: 720, margin: "0 auto" }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-          {[["search", "Cerca titoli"], ["portfolio", "Il mio portafoglio"]].map(([t, label]) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                background: tab === t ? T.blue : T.surface,
-                color: tab === t ? "#fff" : T.textSecondary,
-                border: `1.5px solid ${tab === t ? T.blue : T.border}`,
-                borderRadius: 10, padding: "9px 18px",
-                fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SearchPanel
+          onAdd={(stock) => setAddModal({ open: true, stock })}
+          onExplore={(s) => setExploreStock(s)}
+        />
 
-        {tab === "search" && (
-          <SearchPanel onAdd={addHolding} onExplore={(s) => { setExploreStock(s); setTab("explore"); }} />
+        {exploreStock && (
+          <div style={{ marginTop: 16 }}>
+            <ExplorePanel stock={exploreStock} onClose={() => setExploreStock(null)} />
+          </div>
         )}
-        {tab === "explore" && exploreStock && (
-          <ExplorePanel stock={exploreStock} onClose={() => setTab("search")} />
-        )}
-        {tab === "portfolio" && currentPf && (
-          <PortfolioEditor portfolio={currentPf} onChange={updatePf} />
+
+        {currentPf && (
+          <div style={{ marginTop: 32, paddingTop: 24, borderTop: `1px solid ${T.border}` }}>
+            <PortfolioEditor portfolio={currentPf} onChange={updatePf} />
+          </div>
         )}
       </main>
+
+      {/* Add-to-portfolio modal */}
+      {addModal.open && (
+        <AddToPortfolioModal
+          stock={addModal.stock}
+          portfolios={portfolios}
+          onConfirm={(portfolioId) => {
+            addHolding(addModal.stock, portfolioId);
+            setAddModal({ open: false, stock: null });
+          }}
+          onAddNew={() => {
+            const stock = addModal.stock;
+            const pf = makePortfolio();
+            const isFirstHolding = portfolios.every((p) => p.holdings.length === 0);
+            setPortfolios((prev) => [...prev, { ...pf, holdings: [stock] }]);
+            setSelectedPf(pf.id);
+            setAddModal({ open: false, stock: null });
+            if (isFirstHolding && !user && !localStorage.getItem("investsim_gate_shown")) {
+              setSoftGateOpen(true);
+            }
+          }}
+          onClose={() => setAddModal({ open: false, stock: null })}
+        />
+      )}
 
       {/* Soft gate modal */}
       {softGateOpen && (
