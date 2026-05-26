@@ -79,11 +79,11 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
     setError(null);
 
     if (tab === "signup" && password !== confirmPassword) {
-      setError("Le password non corrispondono.");
+      setError("Passwords do not match.");
       return;
     }
     if (password.length < 6) {
-      setError("La password deve avere almeno 6 caratteri.");
+      setError("Password must be at least 6 characters.");
       return;
     }
 
@@ -93,9 +93,9 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
 
     if (authError) {
       const messages = {
-        "Invalid login credentials": "Email o password errati.",
-        "Email not confirmed": "Controlla la tua email per confermare l'account.",
-        "User already registered": "Esiste già un account con questa email. Prova ad accedere.",
+        "Invalid login credentials": "Incorrect email or password.",
+        "Email not confirmed": "Check your email to confirm your account.",
+        "User already registered": "An account with this email already exists. Try signing in.",
       };
       setError(messages[authError.message] || authError.message);
       setLoading(false);
@@ -131,7 +131,7 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
             fontSize: 15, fontWeight: 800, color: T.primary,
             letterSpacing: "0.12em", textTransform: "uppercase",
             fontFamily: "'Syne', sans-serif",
-          }}>INVEST</span>
+          }}>NVEST</span>
           <button
             onClick={close}
             style={{ background: "transparent", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 2 }}
@@ -144,7 +144,7 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
           borderRadius: 3, padding: 3, marginBottom: 26,
           border: `1px solid ${T.border}`,
         }}>
-          {[["login", "Accedi"], ["signup", "Registrati"]].map(([t, label]) => (
+          {[["login", "Sign in"], ["signup", "Sign up"]].map(([t, label]) => (
             <button
               key={t}
               onClick={() => switchTab(t)}
@@ -163,10 +163,10 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
-          <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="la@tua.email" />
-          <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="almeno 6 caratteri" />
+          <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="your@email.com" />
+          <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="at least 6 characters" />
           {tab === "signup" && (
-            <Field label="Conferma password" type="password" value={confirmPassword} onChange={setConfirmPassword} placeholder="ripeti la password" />
+            <Field label="Confirm password" type="password" value={confirmPassword} onChange={setConfirmPassword} placeholder="repeat password" />
           )}
 
           {error && (
@@ -192,22 +192,22 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
               letterSpacing: "0.09em", textTransform: "uppercase",
             }}
           >
-            {loading ? "Un attimo…" : tab === "login" ? "Accedi" : "Crea account gratuito"}
+            {loading ? "Loading…" : tab === "login" ? "Sign in" : "Create free account"}
           </button>
         </form>
 
         {/* Switch link */}
         <p style={{ textAlign: "center", fontSize: 13, color: T.textSecondary, marginTop: 18, marginBottom: 0 }}>
           {tab === "login" ? (
-            <>Non hai un account?{" "}
+            <>Don&apos;t have an account?{" "}
               <button onClick={() => switchTab("signup")} style={{ background: "none", border: "none", color: T.primary, fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0 }}>
-                Registrati gratis
+                Sign up for free
               </button>
             </>
           ) : (
-            <>Hai già un account?{" "}
+            <>Already have an account?{" "}
               <button onClick={() => switchTab("login")} style={{ background: "none", border: "none", color: T.primary, fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0 }}>
-                Accedi
+                Sign in
               </button>
             </>
           )}

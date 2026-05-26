@@ -44,7 +44,7 @@ const CHART_COLORS = [
   "#F4511E", "#00897B", "#AB47BC", "#1565C0", "#F9A825",
 ];
 
-const RISK_LABEL = { Low: "Basso", Medium: "Medio", High: "Alto", "Very High": "Molto alto" };
+const RISK_LABEL = { Low: "Low", Medium: "Medium", High: "High", "Very High": "Very High" };
 const RISK_COLOR = {
   Low:         { bg: "rgba(0,153,106,0.07)",  text: "#00996A", border: "rgba(0,153,106,0.20)" },
   Medium:      { bg: "rgba(184,112,0,0.07)",  text: "#B87000", border: "rgba(184,112,0,0.20)" },
@@ -60,7 +60,7 @@ const fmtK = (v) => {
 };
 
 const fmtCHF = (v) =>
-  new Intl.NumberFormat("it-CH", { style: "currency", currency: "CHF", maximumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("en-CH", { style: "currency", currency: "CHF", maximumFractionDigits: 0 }).format(v);
 
 const calcDCA = (monthly, annualRate, years) => {
   const mr = annualRate / 12;
@@ -109,7 +109,7 @@ function RiskBadge({ risk }) {
       fontSize: 10, fontWeight: 700, borderRadius: 3, padding: "2px 8px",
       textTransform: "uppercase", letterSpacing: "0.08em",
       fontFamily: "'Syne', sans-serif",
-    }}>RISCHIO {(RISK_LABEL[risk] || risk).toUpperCase()}</span>
+    }}>RISK {(RISK_LABEL[risk] || risk).toUpperCase()}</span>
   );
 }
 
@@ -119,10 +119,10 @@ function ExplanationSection({ explanation }) {
   if (!explanation) return null;
 
   const items = [
-    { icon: "📈", label: "DATI STORICI",      text: explanation.historical },
-    { icon: "🔍", label: "CONTESTO ATTUALE",  text: explanation.currentContext },
-    { icon: "⚠️", label: "FATTORI DI RISCHIO", text: explanation.riskFactors },
-    { icon: "🧮", label: "METODOLOGIA",       text: explanation.methodology },
+    { icon: "📈", label: "HISTORICAL DATA",  text: explanation.historical },
+    { icon: "🔍", label: "CURRENT CONTEXT",  text: explanation.currentContext },
+    { icon: "⚠️", label: "RISK FACTORS",     text: explanation.riskFactors },
+    { icon: "🧮", label: "METHODOLOGY",      text: explanation.methodology },
   ];
 
   return (
@@ -136,10 +136,10 @@ function ExplanationSection({ explanation }) {
         }}
       >
         <span style={{ fontSize: 11, fontWeight: 700, color: T.textSecondary, letterSpacing: "0.10em", textTransform: "uppercase" }}>
-          Come l'abbiamo calcolato
+          How we calculated this
         </span>
         <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em" }}>
-          {open ? "CHIUDI ▲" : "MOSTRA ▼"}
+          {open ? "CLOSE ▲" : "SHOW ▼"}
         </span>
       </button>
 
@@ -178,12 +178,12 @@ function SearchPanel({ onAdd, onExplore }) {
     try {
       const data = await fetchStockInfo(query);
       if (data.symbol === "NOT_FOUND" || !data.returns?.base) {
-        setError("Titolo non trovato. Prova con un nome diverso — es. Apple, S&P 500, Oro.");
+        setError("Asset not found. Try a different name — e.g. Apple, S&P 500, Gold.");
       } else {
         setResult(data);
       }
     } catch {
-      setError("Qualcosa è andato storto. Riprova tra qualche secondo.");
+      setError("Something went wrong. Please try again in a moment.");
     }
     setLoading(false);
   };
@@ -199,7 +199,7 @@ function SearchPanel({ onAdd, onExplore }) {
             letterSpacing: "0.10em", textTransform: "uppercase",
             fontFamily: "Georgia, 'Times New Roman', serif",
           }}>
-            Il tuo futuro
+            Your financial
           </h1>
           <h1 style={{
             fontSize: "clamp(32px, 7vw, 60px)", fontWeight: 700,
@@ -207,10 +207,10 @@ function SearchPanel({ onAdd, onExplore }) {
             letterSpacing: "0.10em", textTransform: "uppercase",
             fontFamily: "Georgia, 'Times New Roman', serif",
           }}>
-            finanziario
+            future
           </h1>
           <p style={{ fontSize: 15, color: T.textSecondary, margin: "0 0 36px", lineHeight: 1.75, maxWidth: 440, marginLeft: "auto", marginRight: "auto" }}>
-            Cerca un titolo, un ETF o un indice — scopri quanto può valere il tuo investimento nel tempo.
+            Search for a stock, ETF or index — see how much your investment could be worth over time.
           </p>
         </div>
       )}
@@ -228,7 +228,7 @@ function SearchPanel({ onAdd, onExplore }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && search()}
-            placeholder="Apple, S&P 500, Bitcoin, Oro…"
+            placeholder="Apple, S&P 500, Bitcoin, Gold…"
             style={{
               flex: 1, border: "none", outline: "none",
               fontSize: 15, color: T.text, background: "transparent",
@@ -246,13 +246,13 @@ function SearchPanel({ onAdd, onExplore }) {
               letterSpacing: "0.09em", textTransform: "uppercase",
             }}
           >
-            {loading ? "Cerco…" : "Cerca"}
+            {loading ? "Searching…" : "Search"}
           </button>
         </div>
 
         {!result && (
           <p style={{ textAlign: "center", fontSize: 11, color: T.textMuted, marginTop: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-            Popolari: Apple · S&P 500 · Tesla · Oro · QQQ · Bitcoin
+            Popular: Apple · S&P 500 · Tesla · Gold · QQQ · Bitcoin
           </p>
         )}
       </div>
@@ -291,7 +291,7 @@ function SearchPanel({ onAdd, onExplore }) {
             </div>
             {result.currentPrice && (
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 2, fontFamily: "'Syne', sans-serif" }}>Prezzo indicativo</div>
+                <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 2, fontFamily: "'Syne', sans-serif" }}>Indicative price</div>
                 <div style={{ fontSize: 17, fontWeight: 600, color: T.text, ...NUM }}>
                   {result.currency} {result.currentPrice}
                 </div>
@@ -309,13 +309,13 @@ function SearchPanel({ onAdd, onExplore }) {
             borderRadius: 4, padding: "16px 18px", marginBottom: 22,
           }}>
             <div style={{ fontSize: 10, color: T.textMuted, marginBottom: 14, letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>
-              Scenari di rendimento annuo — benchmark 20-30 anni
+              Annual return scenarios — 20–30 year benchmarks
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
               {[
-                { key: "pessimistic", label: "Pessimistico", color: "#E8352A", bg: "rgba(232,53,42,0.05)", border: "rgba(232,53,42,0.15)" },
-                { key: "base",        label: "Base",         color: "#888888", bg: "rgba(136,136,136,0.04)", border: "rgba(136,136,136,0.12)" },
-                { key: "optimistic",  label: "Ottimistico",  color: "#00996A", bg: "rgba(0,153,106,0.05)", border: "rgba(0,153,106,0.15)" },
+                { key: "pessimistic", label: "Pessimistic", color: "#E8352A", bg: "rgba(232,53,42,0.05)", border: "rgba(232,53,42,0.15)" },
+                { key: "base",        label: "Base",        color: "#888888", bg: "rgba(136,136,136,0.04)", border: "rgba(136,136,136,0.12)" },
+                { key: "optimistic",  label: "Optimistic",  color: "#00996A", bg: "rgba(0,153,106,0.05)", border: "rgba(0,153,106,0.15)" },
               ].map(({ key, label, color, bg, border }) => (
                 <div key={key} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
                   <div style={{ fontSize: 9, color, fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>{label}</div>
@@ -331,10 +331,10 @@ function SearchPanel({ onAdd, onExplore }) {
           <div style={{ marginBottom: 22 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: T.textSecondary, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-                Quanto vuoi investire ogni mese?
+                How much do you want to invest per month?
               </span>
               <span style={{ fontSize: 20, fontWeight: 700, color: T.primary, flexShrink: 0, marginLeft: 8, ...NUM }}>
-                CHF {monthly.toLocaleString("it-CH")}
+                CHF {monthly.toLocaleString("en-CH")}
               </span>
             </div>
             <input
@@ -343,7 +343,7 @@ function SearchPanel({ onAdd, onExplore }) {
               style={{ width: "100%", accentColor: T.primary }}
             />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: T.textMuted, marginTop: 6, ...NUM }}>
-              <span>CHF 50</span><span>CHF 3.000</span>
+              <span>CHF 50</span><span>CHF 3,000</span>
             </div>
           </div>
 
@@ -358,11 +358,11 @@ function SearchPanel({ onAdd, onExplore }) {
                   textAlign: "center", border: `1px solid ${T.border}`,
                 }}>
                   <div style={{ fontSize: 10, color: T.textMuted, marginBottom: 8, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-                    {y} anni
+                    {y} years
                   </div>
                   <div style={{ fontSize: 22, fontWeight: 700, color: T.text, ...NUM }}>{fmtK(fv)}</div>
                   <div style={{ fontSize: 11, color: T.green, marginTop: 6, ...NUM }}>
-                    +{Math.round((fv / inv - 1) * 100)}% sul versato
+                    +{Math.round((fv / inv - 1) * 100)}% on invested
                   </div>
                 </div>
               );
@@ -382,7 +382,7 @@ function SearchPanel({ onAdd, onExplore }) {
                 letterSpacing: "0.09em", textTransform: "uppercase",
               }}
             >
-              Aggiungi al portafoglio
+              Add to portfolio
             </button>
             <button
               onClick={() => onExplore(result)}
@@ -393,7 +393,7 @@ function SearchPanel({ onAdd, onExplore }) {
                 letterSpacing: "0.09em", textTransform: "uppercase",
               }}
             >
-              Vedi simulazione
+              View simulation
             </button>
           </div>
         </div>
@@ -403,18 +403,18 @@ function SearchPanel({ onAdd, onExplore }) {
 }
 
 const SCENARIO_META = [
-  { key: "pessimistic", label: "Pessimistico", color: "#E8352A" },
-  { key: "base",        label: "Base",         color: "#888888" },
-  { key: "optimistic",  label: "Ottimistico",  color: "#00996A" },
+  { key: "pessimistic", label: "Pessimistic", color: "#E8352A" },
+  { key: "base",        label: "Base",        color: "#888888" },
+  { key: "optimistic",  label: "Optimistic",  color: "#00996A" },
 ];
 
 // ─── EXPLORE PANEL ────────────────────────────────────────────────────────────
 const PRICE_YEARS = [1, 3, 5, 10, 15, 20];
 
 function fmtPrice(v) {
-  if (v >= 1000) return v.toLocaleString("it-CH", { maximumFractionDigits: 0 });
-  if (v >= 10)   return v.toLocaleString("it-CH", { maximumFractionDigits: 1 });
-  return v.toLocaleString("it-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (v >= 1000) return v.toLocaleString("en-CH", { maximumFractionDigits: 0 });
+  if (v >= 10)   return v.toLocaleString("en-CH", { maximumFractionDigits: 1 });
+  return v.toLocaleString("en-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function ExplorePanel({ stock, onClose }) {
@@ -451,10 +451,10 @@ function ExplorePanel({ stock, onClose }) {
       <div style={{ marginBottom: 22 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: T.textSecondary, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-            Investimento mensile
+            Monthly investment
           </span>
           <span style={{ fontSize: 18, fontWeight: 700, color: T.primary, ...NUM }}>
-            CHF {monthly.toLocaleString("it-CH")}
+            CHF {monthly.toLocaleString("en-CH")}
           </span>
         </div>
         <input
@@ -463,7 +463,7 @@ function ExplorePanel({ stock, onClose }) {
           style={{ width: "100%", accentColor: T.primary }}
         />
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: T.textMuted, marginTop: 4, ...NUM }}>
-          <span>CHF 50</span><span>CHF 5.000</span>
+          <span>CHF 50</span><span>CHF 5,000</span>
         </div>
       </div>
 
@@ -479,20 +479,20 @@ function ExplorePanel({ stock, onClose }) {
             ))}
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-          <XAxis dataKey="year" stroke={T.border} tick={{ fontSize: 10, fill: T.textMuted, fontFamily: "'DM Mono'" }} tickFormatter={(v) => `${v}a`} />
+          <XAxis dataKey="year" stroke={T.border} tick={{ fontSize: 10, fill: T.textMuted, fontFamily: "'DM Mono'" }} tickFormatter={(v) => `${v}y`} />
           <YAxis stroke={T.border} tick={{ fontSize: 10, fill: T.textMuted, fontFamily: "'DM Mono'" }} tickFormatter={fmtK} />
           <Tooltip
             contentStyle={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 4, fontSize: 12, fontFamily: "'DM Mono'" }}
             formatter={(v, name) => {
               const s = SCENARIO_META.find((m) => m.key === name);
-              return [fmtCHF(v), s ? s.label : name === "invested" ? "Versato" : name];
+              return [fmtCHF(v), s ? s.label : name === "invested" ? "Invested" : name];
             }}
-            labelFormatter={(l) => `Anno ${l}`}
+            labelFormatter={(l) => `Year ${l}`}
           />
           <Legend wrapperStyle={{ fontSize: 11, color: T.textSecondary, fontFamily: "'Syne'" }}
             formatter={(v) => {
               const s = SCENARIO_META.find((m) => m.key === v);
-              return s ? s.label : "Versato";
+              return s ? s.label : "Invested";
             }}
           />
           <Area type="monotone" dataKey="invested" stroke={T.border} fill="transparent" strokeDasharray="5 3" strokeWidth={1.5} dot={false} />
@@ -511,13 +511,13 @@ function ExplorePanel({ stock, onClose }) {
               background: T.surface, borderRadius: 4, padding: "10px 4px",
               textAlign: "center", border: `1px solid ${T.border}`,
             }}>
-              <div style={{ fontSize: 9, color: T.textMuted, marginBottom: 6, letterSpacing: "0.07em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>{y} anni</div>
+              <div style={{ fontSize: 9, color: T.textMuted, marginBottom: 6, letterSpacing: "0.07em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>{y} yr</div>
               {SCENARIO_META.map(({ key, color }) => {
                 const fv = Math.round(calcDCA(monthly, returns[key] / 100, y));
                 return (
                   <div key={key} style={{ marginBottom: 5 }}>
                     <div style={{ fontSize: 9, color, fontWeight: 700, lineHeight: 1.2, letterSpacing: "0.04em", fontFamily: "'Syne', sans-serif" }}>
-                      {key === "pessimistic" ? "Pess." : key === "base" ? "Base" : "Ott."}
+                      {key === "pessimistic" ? "Pess." : key === "base" ? "Base" : "Opt."}
                     </div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: T.text, ...NUM }}>{fmtK(fv)}</div>
                     <div style={{ fontSize: 9, color, ...NUM }}>{(fv / inv).toFixed(1)}×</div>
@@ -533,20 +533,20 @@ function ExplorePanel({ stock, onClose }) {
       <div style={{ marginTop: 28, borderTop: `1px solid ${T.border}`, paddingTop: 22 }}>
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif", marginBottom: 4 }}>
-            Andamento atteso del prezzo
+            Expected price trajectory
           </div>
           {price ? (
             <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.6 }}>
-              {stock.symbol} oggi vale{" "}
+              {stock.symbol} is currently worth{" "}
               <span style={{ ...NUM, fontWeight: 700, color: T.text }}>{currency} {fmtPrice(price)}</span>
-              {" "}— scenario base a 10 anni:{" "}
+              {" "}— base scenario in 10 years:{" "}
               <span style={{ ...NUM, fontWeight: 700, color: T.green }}>
                 {currency} {fmtPrice(price * Math.pow(1 + returns.base / 100, 10))}
               </span>
             </div>
           ) : (
             <div style={{ fontSize: 13, color: T.textSecondary }}>
-              Proiezione basata sui tre scenari di rendimento annuo.
+              Projection based on the three annual return scenarios.
             </div>
           )}
         </div>
@@ -556,7 +556,7 @@ function ExplorePanel({ stock, onClose }) {
             <thead>
               <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
                 <th style={{ textAlign: "left", padding: "9px 14px", color: T.textSecondary, fontWeight: 700, fontSize: 10, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-                  Anno
+                  Year
                 </th>
                 {SCENARIO_META.map(({ key, label, color }) => (
                   <th key={key} style={{ textAlign: "right", padding: "9px 14px", fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif", color, whiteSpace: "nowrap" }}>
@@ -569,7 +569,7 @@ function ExplorePanel({ stock, onClose }) {
               {PRICE_YEARS.map((y, i) => (
                 <tr key={y} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 ? T.surface : T.bg }}>
                   <td style={{ padding: "9px 14px", fontWeight: 700, color: T.textSecondary, fontFamily: "'Syne', sans-serif", fontSize: 12 }}>
-                    +{y} {y === 1 ? "anno" : "anni"}
+                    +{y} {y === 1 ? "year" : "years"}
                   </td>
                   {SCENARIO_META.map(({ key, color }) => {
                     const factor = Math.pow(1 + returns[key] / 100, y);
@@ -597,7 +597,7 @@ function ExplorePanel({ stock, onClose }) {
           </table>
         </div>
         <p style={{ fontSize: 11, color: T.textMuted, marginTop: 8, lineHeight: 1.5 }}>
-          Proiezione basata su rendimenti nominali storici. Il prezzo indicativo proviene dalla ricerca AI e potrebbe non essere aggiornato.
+          Projection based on historical nominal returns. The indicative price comes from AI research and may not be up to date.
         </p>
       </div>
 
@@ -631,8 +631,8 @@ function PortfolioCard({ portfolio, onSelect, onDelete, selected }) {
         {portfolio.name}
       </div>
       <div style={{ fontSize: 12, color: T.textSecondary, marginBottom: 8, ...NUM }}>
-        CHF {total.toLocaleString("it-CH")} / mese · {portfolio.holdings.length}{" "}
-        {portfolio.holdings.length === 1 ? "titolo" : "titoli"}
+        CHF {total.toLocaleString("en-CH")} / mo · {portfolio.holdings.length}{" "}
+        {portfolio.holdings.length === 1 ? "holding" : "holdings"}
       </div>
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         {portfolio.holdings.map((h) => (
@@ -690,7 +690,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
         />
         {totalMonthly > 0 && (
           <span style={{ fontSize: 13, color: T.textSecondary, ...NUM }}>
-            CHF {totalMonthly.toLocaleString("it-CH")} / mese
+            CHF {totalMonthly.toLocaleString("en-CH")} / mo
           </span>
         )}
       </div>
@@ -698,7 +698,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
       {/* Mode toggle */}
       {portfolio.holdings.length > 0 && (
         <div style={{ display: "flex", gap: 6, marginBottom: 22 }}>
-          {[["amount", "Importi"], ["percent", "Percentuali"]].map(([m, label]) => (
+          {[["amount", "Amounts"], ["percent", "Percentages"]].map(([m, label]) => (
             <button
               key={m}
               onClick={() => { if (m === "percent") initPercent(); setMode(m); }}
@@ -724,10 +724,10 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
         }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📈</div>
           <div style={{ fontWeight: 700, color: T.text, marginBottom: 8, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-            Nessun titolo ancora
+            No holdings yet
           </div>
           <div style={{ fontSize: 13, color: T.textSecondary, marginBottom: 28, lineHeight: 1.7 }}>
-            Cerca un titolo e aggiungilo a questo portafoglio.
+            Search for an asset and add it to this portfolio.
           </div>
           <button
             onClick={onGoToSearch}
@@ -737,7 +737,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
               fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "'Syne', sans-serif",
               letterSpacing: "0.09em", textTransform: "uppercase",
             }}
-          >Aggiungi il primo titolo</button>
+          >Add your first asset</button>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
@@ -757,7 +757,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
                     <span style={{ color: T.textMuted }}>·</span>
                     <span style={{ color: "#888888" }}>Base +{h.returns?.base ?? h.rate}%</span>
                     <span style={{ color: T.textMuted }}>·</span>
-                    <span style={{ color: "#00996A" }}>Ott. +{h.returns?.optimistic ?? h.rate}%</span>
+                    <span style={{ color: "#00996A" }}>Opt. +{h.returns?.optimistic ?? h.rate}%</span>
                   </div>
                 </div>
                 <button
@@ -769,9 +769,9 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
               {mode === "amount" ? (
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, color: T.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Investimento mensile</span>
+                    <span style={{ fontSize: 11, color: T.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Monthly investment</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: T.text, ...NUM }}>
-                      CHF {h.monthly.toLocaleString("it-CH")}
+                      CHF {h.monthly.toLocaleString("en-CH")}
                     </span>
                   </div>
                   <input
@@ -783,7 +783,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
               ) : (
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, color: T.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Quota del totale</span>
+                    <span style={{ fontSize: 11, color: T.textSecondary, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Portfolio share</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: T.text, ...NUM }}>{h._pct || 0}%</span>
                   </div>
                   <input
@@ -807,10 +807,10 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
                 <span style={{ fontSize: 11, color: T.textSecondary, letterSpacing: "0.09em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>
-                  Totale mensile
+                  Monthly total
                 </span>
                 <span style={{ fontSize: 15, fontWeight: 700, color: T.primary, ...NUM }}>
-                  CHF {totalMonthly.toLocaleString("it-CH")}
+                  CHF {totalMonthly.toLocaleString("en-CH")}
                 </span>
               </div>
               <input
@@ -829,7 +829,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
         <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: T.text, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-              Proiezione del portafoglio
+              Portfolio projection
             </div>
             <div style={{ display: "flex", gap: 4 }}>
               {SCENARIO_META.map(({ key, label, color }) => (
@@ -849,7 +849,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
             </div>
           </div>
           <p style={{ fontSize: 12, color: T.textMuted, marginBottom: 18, lineHeight: 1.5 }}>
-            Simulazione basata su rendimenti storici. I risultati passati non garantiscono quelli futuri.
+            Based on historical returns. Past performance does not guarantee future results.
           </p>
 
           <div style={{
@@ -867,16 +867,16 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
                   ))}
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-                <XAxis dataKey="year" stroke={T.border} tick={{ fontSize: 10, fill: T.textMuted, fontFamily: "'DM Mono'" }} tickFormatter={(v) => `${v}a`} />
+                <XAxis dataKey="year" stroke={T.border} tick={{ fontSize: 10, fill: T.textMuted, fontFamily: "'DM Mono'" }} tickFormatter={(v) => `${v}y`} />
                 <YAxis stroke={T.border} tick={{ fontSize: 10, fill: T.textMuted, fontFamily: "'DM Mono'" }} tickFormatter={fmtK} />
                 <Tooltip
                   contentStyle={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 4, fontSize: 12, fontFamily: "'DM Mono'" }}
-                  formatter={(v, name) => [fmtCHF(v), name === "invested" ? "Versato" : name === "total" ? "Totale" : name]}
-                  labelFormatter={(l) => `Anno ${l}`}
+                  formatter={(v, name) => [fmtCHF(v), name === "invested" ? "Invested" : name === "total" ? "Total" : name]}
+                  labelFormatter={(l) => `Year ${l}`}
                 />
                 <Legend
                   wrapperStyle={{ fontSize: 11, color: T.textSecondary, fontFamily: "'Syne'" }}
-                  formatter={(v) => v === "invested" ? "Versato" : v === "total" ? "Totale portafoglio" : v}
+                  formatter={(v) => v === "invested" ? "Invested" : v === "total" ? "Total portfolio" : v}
                 />
                 <Area type="monotone" dataKey="invested" name="invested" stroke={T.border} fill="transparent" strokeDasharray="5 3" strokeWidth={1.5} dot={false} />
                 {portfolio.holdings.map((h) => (
@@ -892,10 +892,10 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 400 }}>
               <thead>
                 <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                  <th style={{ textAlign: "left", padding: "11px 16px", color: T.textSecondary, fontWeight: 700, fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Titolo</th>
+                  <th style={{ textAlign: "left", padding: "11px 16px", color: T.textSecondary, fontWeight: 700, fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Asset</th>
                   {MILESTONES.map((y) => (
                     <th key={y} style={{ textAlign: "right", padding: "11px 16px", color: T.textSecondary, fontWeight: 700, fontSize: 10, letterSpacing: "0.09em", whiteSpace: "nowrap", fontFamily: "'Syne', sans-serif" }}>
-                      {y} ANNI
+                      {y} YRS
                     </th>
                   ))}
                 </tr>
@@ -912,7 +912,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
                   </tr>
                 ))}
                 <tr style={{ background: T.primaryLight, borderTop: `1px solid ${T.primaryBorder}` }}>
-                  <td style={{ padding: "11px 16px", fontWeight: 700, color: T.primary, letterSpacing: "0.09em", fontFamily: "'Syne', sans-serif" }}>TOTALE</td>
+                  <td style={{ padding: "11px 16px", fontWeight: 700, color: T.primary, letterSpacing: "0.09em", fontFamily: "'Syne', sans-serif" }}>TOTAL</td>
                   {MILESTONES.map((y) => (
                     <td key={y} style={{ textAlign: "right", padding: "11px 16px", fontWeight: 700, color: T.primary, ...NUM }}>
                       {fmtCHF(portfolio.holdings.reduce((s, h) => s + calcDCA(h.monthly, scenarioRate(h) / 100, y), 0))}
@@ -920,7 +920,7 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
                   ))}
                 </tr>
                 <tr style={{ background: T.surface }}>
-                  <td style={{ padding: "6px 16px", fontSize: 11, color: T.textMuted, letterSpacing: "0.04em", fontFamily: "'Syne', sans-serif" }}>di cui versato</td>
+                  <td style={{ padding: "6px 16px", fontSize: 11, color: T.textMuted, letterSpacing: "0.04em", fontFamily: "'Syne', sans-serif" }}>of which invested</td>
                   {MILESTONES.map((y) => {
                     const inv = totalMonthly * 12 * y;
                     const tot = portfolio.holdings.reduce((s, h) => s + calcDCA(h.monthly, scenarioRate(h) / 100, y), 0);
@@ -964,7 +964,7 @@ function AddToPortfolioModal({ stock, portfolios, onConfirm, onAddNew, onClose }
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: "0.09em", textTransform: "uppercase" }}>
-              Aggiungi al portafoglio
+              Add to portfolio
             </div>
             <div style={{ fontSize: 13, color: T.textSecondary, marginTop: 4 }}>
               {stock.symbol} · {stock.name}
@@ -992,8 +992,8 @@ function AddToPortfolioModal({ stock, portfolios, onConfirm, onAddNew, onClose }
               <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{pf.name}</div>
               <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
                 {pf.holdings.length === 0
-                  ? "Nessun titolo"
-                  : `${pf.holdings.length} ${pf.holdings.length === 1 ? "titolo" : "titoli"}`}
+                  ? "No holdings"
+                  : `${pf.holdings.length} ${pf.holdings.length === 1 ? "holding" : "holdings"}`}
               </div>
             </button>
           ))}
@@ -1007,7 +1007,7 @@ function AddToPortfolioModal({ stock, portfolios, onConfirm, onAddNew, onClose }
               letterSpacing: "0.04em",
             }}
           >
-            + Crea nuovo portafoglio
+            + New portfolio
           </button>
         </div>
 
@@ -1021,7 +1021,7 @@ function AddToPortfolioModal({ stock, portfolios, onConfirm, onAddNew, onClose }
             letterSpacing: "0.09em", textTransform: "uppercase",
           }}
         >
-          Aggiungi
+          Add
         </button>
       </div>
     </div>
@@ -1035,7 +1035,7 @@ const makePortfolio = () => {
   return {
     id,
     supabase_id: crypto.randomUUID(),
-    name: id === 1 ? "Il mio portafoglio" : `Portafoglio ${id}`,
+    name: id === 1 ? "My portfolio" : `Portfolio ${id}`,
     holdings: [],
   };
 };
@@ -1052,6 +1052,13 @@ export default function App() {
   const [authModalTab, setAuthModalTab] = useState("signup");
   const [addModal, setAddModal] = useState({ open: false, stock: null });
   const [activePage, setActivePage] = useState("search");
+  const [searchKey, setSearchKey] = useState(0);
+
+  const goHome = () => {
+    setActivePage("search");
+    setExploreStock(null);
+    setSearchKey((k) => k + 1);
+  };
 
   // ── Supabase sync ──────────────────────────────────────────────────────────
   const saveTimerRef = useRef(null);
@@ -1190,7 +1197,7 @@ export default function App() {
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontWeight: 700, fontSize: 11, color: T.textSecondary, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-            I tuoi portafogli
+            Your portfolios
           </span>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -1212,7 +1219,7 @@ export default function App() {
             letterSpacing: "0.09em", textTransform: "uppercase",
           }}
         >
-          + Nuovo portafoglio
+          + New portfolio
         </button>
       </div>
 
@@ -1232,26 +1239,29 @@ export default function App() {
         >☰</button>
 
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
-          {/* Logo */}
-          <img
-            src="/logo-wisinvest.png"
-            alt="WisiInvest"
-            style={{ height: 44, width: "auto", objectFit: "contain", flexShrink: 0 }}
-          />
-
-          {/* Brand name */}
-          <span style={{
-            fontSize: 16, fontWeight: 800, color: T.primary,
-            textTransform: "uppercase", letterSpacing: "0.10em",
-            fontFamily: "'Syne', sans-serif", flexShrink: 0,
-          }}>INVEST</span>
+          {/* Logo + brand — clickable, goes home */}
+          <div
+            onClick={goHome}
+            style={{ display: "flex", alignItems: "center", gap: 2, cursor: "pointer", flexShrink: 0 }}
+          >
+            <img
+              src="/logo-wisi.png"
+              alt="WisiInvest"
+              style={{ height: 44, width: "auto", objectFit: "contain" }}
+            />
+            <span style={{
+              fontSize: 16, fontWeight: 800, color: T.primary,
+              textTransform: "uppercase", letterSpacing: "0.10em",
+              fontFamily: "'Syne', sans-serif",
+            }}>NVEST</span>
+          </div>
 
           {/* Nav tabs */}
           <div style={{
             display: "flex", gap: 2, background: T.surface,
             borderRadius: 3, padding: 3, border: `1px solid ${T.border}`, flexShrink: 0,
           }}>
-            {[["search", "Cerca"], ["portfolio", "Portafoglio"]].map(([page, label]) => (
+            {[["search", "Search"], ["portfolio", "Portfolio"]].map(([page, label]) => (
               <button
                 key={page}
                 onClick={() => setActivePage(page)}
@@ -1283,7 +1293,7 @@ export default function App() {
                 cursor: "pointer", fontFamily: "'Syne', sans-serif",
                 letterSpacing: "0.07em", textTransform: "uppercase",
               }}
-            >Esci</button>
+            >Sign out</button>
           </div>
         ) : (
           <button
@@ -1294,7 +1304,7 @@ export default function App() {
               padding: "8px 16px", cursor: "pointer", fontFamily: "'Syne', sans-serif",
               flexShrink: 0, letterSpacing: "0.08em", textTransform: "uppercase",
             }}
-          >Accedi</button>
+          >Sign in</button>
         )}
       </header>
 
@@ -1303,6 +1313,7 @@ export default function App() {
         {activePage === "search" && (
           <>
             <SearchPanel
+              key={searchKey}
               onAdd={(stock) => setAddModal({ open: true, stock })}
               onExplore={(s) => setExploreStock(s)}
             />
@@ -1325,7 +1336,7 @@ export default function App() {
                   fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: "'Syne', sans-serif",
                   letterSpacing: "0.09em", textTransform: "uppercase",
                 }}
-              >+ Aggiungi titolo</button>
+              >+ Add asset</button>
             </div>
             <PortfolioEditor
               portfolio={currentPf}
@@ -1377,11 +1388,11 @@ export default function App() {
           }}>
             <div style={{ fontSize: 38, marginBottom: 22 }}>💾</div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: "0 0 12px", letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "Georgia, 'Times New Roman', serif" }}>
-              Salva i tuoi portafogli
+              Save your portfolios
             </h2>
             <p style={{ fontSize: 14, color: T.textSecondary, lineHeight: 1.75, margin: "0 0 32px" }}>
-              Crea un account gratuito per ritrovare i tuoi portafogli ogni volta che torni.
-              Altrimenti verranno persi alla chiusura del browser.
+              Create a free account to find your portfolios every time you come back.
+              Otherwise they'll be lost when you close the browser.
             </p>
             <button
               onClick={() => {
@@ -1397,7 +1408,7 @@ export default function App() {
                 letterSpacing: "0.09em", textTransform: "uppercase",
               }}
             >
-              Crea account gratuito
+              Create free account
             </button>
             <button
               onClick={() => {
@@ -1412,7 +1423,7 @@ export default function App() {
                 letterSpacing: "0.08em", textTransform: "uppercase",
               }}
             >
-              Continua senza account
+              Continue without an account
             </button>
           </div>
         </div>
