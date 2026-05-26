@@ -409,15 +409,26 @@ const SCENARIO_META = [
 ];
 
 // ─── EXPLORE PANEL ────────────────────────────────────────────────────────────
+const PRICE_YEARS = [1, 3, 5, 10, 15, 20];
+
+function fmtPrice(v) {
+  if (v >= 1000) return v.toLocaleString("it-CH", { maximumFractionDigits: 0 });
+  if (v >= 10)   return v.toLocaleString("it-CH", { maximumFractionDigits: 1 });
+  return v.toLocaleString("it-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function ExplorePanel({ stock, onClose }) {
+  const [monthly, setMonthly] = useState(500);
   const returns = stock.returns ?? { pessimistic: stock.rate, base: stock.rate, optimistic: stock.rate };
+  const price = stock.currentPrice;
+  const currency = stock.currency ?? "";
 
   const data = Array.from({ length: 31 }, (_, y) => ({
     year: y,
-    invested: 500 * 12 * y,
-    pessimistic: Math.round(calcDCA(500, returns.pessimistic / 100, y)),
-    base:        Math.round(calcDCA(500, returns.base        / 100, y)),
-    optimistic:  Math.round(calcDCA(500, returns.optimistic  / 100, y)),
+    invested: monthly * 12 * y,
+    pessimistic: Math.round(calcDCA(monthly, returns.pessimistic / 100, y)),
+    base:        Math.round(calcDCA(monthly, returns.base        / 100, y)),
+    optimistic:  Math.round(calcDCA(monthly, returns.optimistic  / 100, y)),
   }));
 
   return (
@@ -425,21 +436,38 @@ function ExplorePanel({ stock, onClose }) {
       background: T.bg, border: `1px solid ${T.border}`,
       borderRadius: 6, padding: "24px",
     }}>
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div>
-          <span style={{ fontSize: 20, fontWeight: 700, color: T.text, letterSpacing: "0.07em", fontFamily: "Georgia, 'Times New Roman', serif" }}>
-            {stock.symbol}
-          </span>
-          <span style={{ fontSize: 12, color: T.textMuted, marginLeft: 14, letterSpacing: "0.06em", fontFamily: "'Syne', sans-serif" }}>
-            CHF 500/mese
-          </span>
-        </div>
+        <span style={{ fontSize: 20, fontWeight: 700, color: T.text, letterSpacing: "0.07em", fontFamily: "Georgia, 'Times New Roman', serif" }}>
+          {stock.symbol}
+        </span>
         <button
           onClick={onClose}
           style={{ background: "transparent", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 4 }}
         >×</button>
       </div>
 
+      {/* Monthly slider */}
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: T.textSecondary, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
+            Investimento mensile
+          </span>
+          <span style={{ fontSize: 18, fontWeight: 700, color: T.primary, ...NUM }}>
+            CHF {monthly.toLocaleString("it-CH")}
+          </span>
+        </div>
+        <input
+          type="range" min={50} max={5000} step={50} value={monthly}
+          onChange={(e) => setMonthly(Number(e.target.value))}
+          style={{ width: "100%", accentColor: T.primary }}
+        />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: T.textMuted, marginTop: 4, ...NUM }}>
+          <span>CHF 50</span><span>CHF 5.000</span>
+        </div>
+      </div>
+
+      {/* DCA chart */}
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <defs>
@@ -474,9 +502,10 @@ function ExplorePanel({ stock, onClose }) {
         </AreaChart>
       </ResponsiveContainer>
 
+      {/* DCA milestone cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginTop: 18 }}>
         {MILESTONES.map((y) => {
-          const inv = 500 * 12 * y;
+          const inv = monthly * 12 * y;
           return (
             <div key={y} style={{
               background: T.surface, borderRadius: 4, padding: "10px 4px",
@@ -484,7 +513,7 @@ function ExplorePanel({ stock, onClose }) {
             }}>
               <div style={{ fontSize: 9, color: T.textMuted, marginBottom: 6, letterSpacing: "0.07em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>{y} anni</div>
               {SCENARIO_META.map(({ key, color }) => {
-                const fv = Math.round(calcDCA(500, returns[key] / 100, y));
+                const fv = Math.round(calcDCA(monthly, returns[key] / 100, y));
                 return (
                   <div key={key} style={{ marginBottom: 5 }}>
                     <div style={{ fontSize: 9, color, fontWeight: 700, lineHeight: 1.2, letterSpacing: "0.04em", fontFamily: "'Syne', sans-serif" }}>
@@ -498,6 +527,78 @@ function ExplorePanel({ stock, onClose }) {
             </div>
           );
         })}
+      </div>
+
+      {/* Price projection */}
+      <div style={{ marginTop: 28, borderTop: `1px solid ${T.border}`, paddingTop: 22 }}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif", marginBottom: 4 }}>
+            Andamento atteso del prezzo
+          </div>
+          {price ? (
+            <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.6 }}>
+              {stock.symbol} oggi vale{" "}
+              <span style={{ ...NUM, fontWeight: 700, color: T.text }}>{currency} {fmtPrice(price)}</span>
+              {" "}— scenario base a 10 anni:{" "}
+              <span style={{ ...NUM, fontWeight: 700, color: T.green }}>
+                {currency} {fmtPrice(price * Math.pow(1 + returns.base / 100, 10))}
+              </span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: T.textSecondary }}>
+              Proiezione basata sui tre scenari di rendimento annuo.
+            </div>
+          )}
+        </div>
+
+        <div style={{ overflowX: "auto", borderRadius: 4, border: `1px solid ${T.border}` }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 360 }}>
+            <thead>
+              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                <th style={{ textAlign: "left", padding: "9px 14px", color: T.textSecondary, fontWeight: 700, fontSize: 10, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
+                  Anno
+                </th>
+                {SCENARIO_META.map(({ key, label, color }) => (
+                  <th key={key} style={{ textAlign: "right", padding: "9px 14px", fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif", color, whiteSpace: "nowrap" }}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {PRICE_YEARS.map((y, i) => (
+                <tr key={y} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 ? T.surface : T.bg }}>
+                  <td style={{ padding: "9px 14px", fontWeight: 700, color: T.textSecondary, fontFamily: "'Syne', sans-serif", fontSize: 12 }}>
+                    +{y} {y === 1 ? "anno" : "anni"}
+                  </td>
+                  {SCENARIO_META.map(({ key, color }) => {
+                    const factor = Math.pow(1 + returns[key] / 100, y);
+                    const pct = Math.round((factor - 1) * 100);
+                    return (
+                      <td key={key} style={{ textAlign: "right", padding: "9px 14px", ...NUM }}>
+                        {price ? (
+                          <span style={{ color: T.text, fontWeight: 600 }}>
+                            {currency} {fmtPrice(price * factor)}
+                            <span style={{ fontSize: 10, color, marginLeft: 5 }}>
+                              {pct >= 0 ? "+" : ""}{pct}%
+                            </span>
+                          </span>
+                        ) : (
+                          <span style={{ color, fontWeight: 700 }}>
+                            {pct >= 0 ? "+" : ""}{pct}%
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ fontSize: 11, color: T.textMuted, marginTop: 8, lineHeight: 1.5 }}>
+          Proiezione basata su rendimenti nominali storici. Il prezzo indicativo proviene dalla ricerca AI e potrebbe non essere aggiornato.
+        </p>
       </div>
 
       <ExplanationSection explanation={stock.explanation} />
