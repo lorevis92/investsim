@@ -2,16 +2,26 @@ import { useState, useEffect } from "react";
 import { useAuth } from "./AuthContext";
 
 const T = {
-  bg: "#F9FAFB", surface: "#FFFFFF", border: "#E5E7EB",
-  text: "#111827", textSecondary: "#6B7280", textMuted: "#9CA3AF",
-  blue: "#2563EB", blueLight: "#EFF6FF", blueBorder: "#BFDBFE",
-  red: "#DC2626", redLight: "#FEF2F2",
+  bg:            "#FFFFFF",
+  surface:       "#F8F8F8",
+  border:        "#E8E8E8",
+  text:          "#111111",
+  textSecondary: "#666666",
+  textMuted:     "#AAAAAA",
+  primary:       "#E8352A",
+  primaryLight:  "rgba(232,53,42,0.06)",
+  red:           "#E8352A",
+  redLight:      "rgba(232,53,42,0.06)",
 };
 
 function Field({ label, type, value, onChange, placeholder }) {
   return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: T.text, marginBottom: 6 }}>
+    <div style={{ marginBottom: 16 }}>
+      <label style={{
+        display: "block", fontSize: 10, fontWeight: 700, color: T.textSecondary,
+        marginBottom: 7, letterSpacing: "0.10em", textTransform: "uppercase",
+        fontFamily: "'Syne', sans-serif",
+      }}>
         {label}
       </label>
       <input
@@ -22,11 +32,13 @@ function Field({ label, type, value, onChange, placeholder }) {
         autoComplete={type === "password" ? "current-password" : "email"}
         style={{
           width: "100%", boxSizing: "border-box",
-          border: `1.5px solid ${T.border}`, borderRadius: 10,
-          padding: "10px 14px", fontSize: 15, color: T.text,
-          background: T.bg, outline: "none", fontFamily: "inherit",
+          border: `1.5px solid ${T.border}`, borderRadius: 3,
+          padding: "11px 14px", fontSize: 14, color: T.text,
+          background: T.bg, outline: "none",
+          fontFamily: "'Syne', sans-serif",
+          transition: "border-color .15s",
         }}
-        onFocus={(e) => { e.target.style.borderColor = T.blue; }}
+        onFocus={(e) => { e.target.style.borderColor = T.primary; }}
         onBlur={(e) => { e.target.style.borderColor = T.border; }}
       />
     </div>
@@ -42,7 +54,6 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Reset form and apply defaultTab every time the modal opens
   useEffect(() => {
     if (open) {
       setTab(defaultTab);
@@ -101,21 +112,26 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 100,
-        background: "rgba(0,0,0,0.4)",
+        background: "rgba(0,0,0,0.30)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 16,
       }}
       onClick={(e) => e.target === e.currentTarget && close()}
     >
       <div style={{
-        background: T.surface, borderRadius: 18,
-        padding: "28px 24px", width: "100%", maxWidth: 400,
-        boxShadow: "0 8px 40px rgba(0,0,0,0.14)",
-        fontFamily: "'Inter', system-ui, sans-serif",
+        background: T.bg, borderRadius: 6,
+        border: `1px solid ${T.border}`,
+        padding: "32px 28px", width: "100%", maxWidth: 400,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.10)",
+        fontFamily: "'Syne', system-ui, sans-serif",
       }}>
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <span style={{ fontSize: 17, fontWeight: 700, color: T.blue }}>WisiInvest</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+          <span style={{
+            fontSize: 15, fontWeight: 800, color: T.primary,
+            letterSpacing: "0.12em", textTransform: "uppercase",
+            fontFamily: "'Syne', sans-serif",
+          }}>INVEST</span>
           <button
             onClick={close}
             style={{ background: "transparent", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 2 }}
@@ -124,8 +140,9 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
 
         {/* Tabs */}
         <div style={{
-          display: "flex", background: T.bg,
-          borderRadius: 10, padding: 3, marginBottom: 22,
+          display: "flex", background: T.surface,
+          borderRadius: 3, padding: 3, marginBottom: 26,
+          border: `1px solid ${T.border}`,
         }}>
           {[["login", "Accedi"], ["signup", "Registrati"]].map(([t, label]) => (
             <button
@@ -133,11 +150,11 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
               onClick={() => switchTab(t)}
               style={{
                 flex: 1, padding: "8px 0", border: "none",
-                borderRadius: 8, fontSize: 14, fontWeight: 600,
-                cursor: "pointer", fontFamily: "inherit",
-                background: tab === t ? T.surface : "transparent",
-                color: tab === t ? T.text : T.textMuted,
-                boxShadow: tab === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                borderRadius: 2, fontSize: 12, fontWeight: 700,
+                cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                background: tab === t ? T.primary : "transparent",
+                color: tab === t ? "#fff" : T.textSecondary,
+                letterSpacing: "0.08em", textTransform: "uppercase",
                 transition: "all .15s",
               }}
             >{label}</button>
@@ -154,9 +171,10 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
 
           {error && (
             <div style={{
-              background: T.redLight, border: "1px solid #FECACA",
-              borderRadius: 8, padding: "10px 14px",
-              color: T.red, fontSize: 13, marginBottom: 14,
+              background: T.redLight, border: `1px solid rgba(232,53,42,0.18)`,
+              borderRadius: 3, padding: "10px 14px",
+              color: T.red, fontSize: 13, marginBottom: 16,
+              fontFamily: "'Syne', sans-serif",
             }}>
               {error}
             </div>
@@ -166,10 +184,12 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
             type="submit"
             disabled={loading}
             style={{
-              width: "100%", background: loading ? T.textMuted : T.blue,
-              color: "#fff", border: "none", borderRadius: 10,
-              padding: "13px 0", fontWeight: 600, fontSize: 15,
-              cursor: loading ? "default" : "pointer", fontFamily: "inherit",
+              width: "100%", background: loading ? T.textMuted : T.primary,
+              color: "#fff", border: "none", borderRadius: 3,
+              padding: "14px 0", fontWeight: 700, fontSize: 12,
+              cursor: loading ? "default" : "pointer",
+              fontFamily: "'Syne', sans-serif",
+              letterSpacing: "0.09em", textTransform: "uppercase",
             }}
           >
             {loading ? "Un attimo…" : tab === "login" ? "Accedi" : "Crea account gratuito"}
@@ -177,16 +197,16 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
         </form>
 
         {/* Switch link */}
-        <p style={{ textAlign: "center", fontSize: 13, color: T.textSecondary, marginTop: 16, marginBottom: 0 }}>
+        <p style={{ textAlign: "center", fontSize: 13, color: T.textSecondary, marginTop: 18, marginBottom: 0 }}>
           {tab === "login" ? (
             <>Non hai un account?{" "}
-              <button onClick={() => switchTab("signup")} style={{ background: "none", border: "none", color: T.blue, fontWeight: 600, cursor: "pointer", fontSize: 13, padding: 0 }}>
+              <button onClick={() => switchTab("signup")} style={{ background: "none", border: "none", color: T.primary, fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0 }}>
                 Registrati gratis
               </button>
             </>
           ) : (
             <>Hai già un account?{" "}
-              <button onClick={() => switchTab("login")} style={{ background: "none", border: "none", color: T.blue, fontWeight: 600, cursor: "pointer", fontSize: 13, padding: 0 }}>
+              <button onClick={() => switchTab("login")} style={{ background: "none", border: "none", color: T.primary, fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0 }}>
                 Accedi
               </button>
             </>
