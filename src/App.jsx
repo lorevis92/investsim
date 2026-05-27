@@ -612,11 +612,15 @@ function ExplorePanel({ stock, onClose }) {
                   </div>
                 ) : (
                   <div
-                    onClick={() => startEdit(key)}
+                    onClick={() => {
+                      console.log("[ExplorePanel] click on", key, "current editingField:", editingField);
+                      setEditingField(key);
+                      setEditValue(String(returns[key]));
+                    }}
                     title="Click to edit"
                     style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1, ...NUM, cursor: "pointer" }}
                   >
-                    +{returns[key]}%
+                    {returns[key] >= 0 ? "+" : ""}{returns[key]}%
                   </div>
                 )}
                 {isCustom && !isEditing && (
