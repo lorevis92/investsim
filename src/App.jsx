@@ -585,7 +585,7 @@ function ExplorePanel({ stock, onClose }) {
                 </div>
                 {isEditing ? (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
-                    <span style={{ color, fontWeight: 700, fontSize: 16, ...NUM }}>+</span>
+                    <span style={{ color, fontWeight: 700, fontSize: 20, ...NUM }}>+</span>
                     <input
                       type="number"
                       min={0}
@@ -600,34 +600,28 @@ function ExplorePanel({ stock, onClose }) {
                       onBlur={() => commitEdit(key)}
                       autoFocus
                       style={{
-                        width: 54, textAlign: "center",
+                        width: 58, textAlign: "center",
                         border: `1.5px solid ${color}`, borderRadius: 3,
                         background: "transparent", color,
-                        fontWeight: 700, fontSize: 16,
+                        fontWeight: 700, fontSize: 20,
                         outline: "none", padding: "2px 4px",
                         fontFamily: "'DM Mono', monospace",
                       }}
                     />
-                    <span style={{ color, fontWeight: 700, fontSize: 16, ...NUM }}>%</span>
+                    <span style={{ color, fontWeight: 700, fontSize: 20, ...NUM }}>%</span>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                    <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1, ...NUM }}>
-                      +{returns[key]}%
-                    </div>
-                    <button
-                      onClick={() => startEdit(key)}
-                      title="Edit value"
-                      style={{
-                        background: "transparent", border: "none", cursor: "pointer",
-                        fontSize: 11, lineHeight: 1, padding: 2, opacity: 0.65,
-                      }}
-                    >✏️</button>
+                  <div
+                    onClick={() => startEdit(key)}
+                    title="Click to edit"
+                    style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1, ...NUM, cursor: "pointer" }}
+                  >
+                    +{returns[key]}%
                   </div>
                 )}
                 {isCustom && !isEditing && (
-                  <div style={{ fontSize: 8, color, marginTop: 5, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif", opacity: 0.75 }}>
-                    custom
+                  <div style={{ fontSize: 8, color, marginTop: 5, letterSpacing: "0.06em", fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>
+                    (custom)
                   </div>
                 )}
               </div>
