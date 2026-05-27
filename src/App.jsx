@@ -418,10 +418,90 @@ function fmtPrice(v) {
 }
 
 function ExplorePanel({ stock, onClose }) {
+  const { user } = useAuth();
   const [monthly, setMonthly] = useState(500);
-  const returns = stock.returns ?? { pessimistic: stock.rate, base: stock.rate, optimistic: stock.rate };
+  const aiReturns = stock.returns ?? { pessimistic: stock.rate, base: stock.rate, optimistic: stock.rate };
   const price = stock.currentPrice;
   const currency = stock.currency ?? "";
+
+  const [overrides, setOverrides] = useState(null);
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState("");
+
+  const returns = overrides ? { ...aiReturns, ...overrides } : aiReturns;
+  const hasOverrides = overrides != null && Object.keys(overrides).length > 0;
+
+  useEffect(() => {
+    const load = async () => {
+      if (user) {
+        try {
+          const { data } = await supabase
+            .from("stocks")
+            .select("user_overrides")
+            .eq("symbol", stock.symbol)
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (data?.user_overrides) {
+            const { userId: _uid, ...rates } = data.user_overrides;
+            setOverrides(rates);
+          }
+        } catch {}
+      } else {
+        try {
+          const saved = localStorage.getItem(`wisi_override_${stock.symbol}`);
+          if (saved) setOverrides(JSON.parse(saved));
+        } catch {}
+      }
+    };
+    load();
+  }, [stock.symbol, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const persistOverrides = async (newOverrides) => {
+    if (user) {
+      try {
+        await supabase.from("stocks").upsert({
+          symbol: stock.symbol,
+          user_id: user.id,
+          user_overrides: { ...newOverrides, userId: user.id },
+          updated_at: new Date().toISOString(),
+        });
+      } catch {}
+    } else {
+      localStorage.setItem(`wisi_override_${stock.symbol}`, JSON.stringify(newOverrides));
+    }
+  };
+
+  const resetToAI = async () => {
+    setOverrides(null);
+    if (user) {
+      try {
+        await supabase.from("stocks").upsert({
+          symbol: stock.symbol,
+          user_id: user.id,
+          user_overrides: null,
+          updated_at: new Date().toISOString(),
+        });
+      } catch {}
+    } else {
+      localStorage.removeItem(`wisi_override_${stock.symbol}`);
+    }
+  };
+
+  const startEdit = (key) => {
+    setEditingField(key);
+    setEditValue(String(returns[key]));
+  };
+
+  const commitEdit = (key) => {
+    const num = parseFloat(editValue);
+    if (!isNaN(num) && num >= 0 && num <= 100) {
+      const parsed = parseFloat(num.toFixed(1));
+      const newOverrides = { ...(overrides ?? {}), [key]: parsed };
+      setOverrides(newOverrides);
+      persistOverrides(newOverrides);
+    }
+    setEditingField(null);
+  };
 
   const data = Array.from({ length: 31 }, (_, y) => ({
     year: y,
@@ -464,6 +544,95 @@ function ExplorePanel({ stock, onClose }) {
         />
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: T.textMuted, marginTop: 4, ...NUM }}>
           <span>CHF 50</span><span>CHF 5,000</span>
+        </div>
+      </div>
+
+      {/* Return scenarios with edit */}
+      <div style={{
+        background: T.surface, border: `1px solid ${T.border}`,
+        borderRadius: 4, padding: "16px 18px", marginBottom: 22,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>
+            Annual return scenarios — 20–30 year benchmarks
+          </div>
+          {hasOverrides && (
+            <button
+              onClick={resetToAI}
+              style={{
+                background: "transparent", border: "none", color: T.primary,
+                fontSize: 10, fontWeight: 700, cursor: "pointer",
+                letterSpacing: "0.06em", textTransform: "uppercase",
+                fontFamily: "'Syne', sans-serif", padding: 0, textDecoration: "underline",
+              }}
+            >
+              Reset to AI estimate
+            </button>
+          )}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+          {[
+            { key: "pessimistic", label: "Pessimistic", color: "#E8352A", bg: "rgba(232,53,42,0.05)", brd: "rgba(232,53,42,0.15)" },
+            { key: "base",        label: "Base",        color: "#888888", bg: "rgba(136,136,136,0.04)", brd: "rgba(136,136,136,0.12)" },
+            { key: "optimistic",  label: "Optimistic",  color: "#00996A", bg: "rgba(0,153,106,0.05)", brd: "rgba(0,153,106,0.15)" },
+          ].map(({ key, label, color, bg, brd }) => {
+            const isCustom = overrides?.[key] != null;
+            const isEditing = editingField === key;
+            return (
+              <div key={key} style={{ background: bg, border: `1px solid ${brd}`, borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
+                <div style={{ fontSize: 9, color, fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
+                  {label}
+                </div>
+                {isEditing ? (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+                    <span style={{ color, fontWeight: 700, fontSize: 16, ...NUM }}>+</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitEdit(key);
+                        if (e.key === "Escape") setEditingField(null);
+                      }}
+                      onBlur={() => commitEdit(key)}
+                      autoFocus
+                      style={{
+                        width: 54, textAlign: "center",
+                        border: `1.5px solid ${color}`, borderRadius: 3,
+                        background: "transparent", color,
+                        fontWeight: 700, fontSize: 16,
+                        outline: "none", padding: "2px 4px",
+                        fontFamily: "'DM Mono', monospace",
+                      }}
+                    />
+                    <span style={{ color, fontWeight: 700, fontSize: 16, ...NUM }}>%</span>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                    <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1, ...NUM }}>
+                      +{returns[key]}%
+                    </div>
+                    <button
+                      onClick={() => startEdit(key)}
+                      title="Edit value"
+                      style={{
+                        background: "transparent", border: "none", cursor: "pointer",
+                        fontSize: 11, lineHeight: 1, padding: 2, opacity: 0.65,
+                      }}
+                    >✏️</button>
+                  </div>
+                )}
+                {isCustom && !isEditing && (
+                  <div style={{ fontSize: 8, color, marginTop: 5, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif", opacity: 0.75 }}>
+                    custom
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
