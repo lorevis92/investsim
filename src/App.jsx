@@ -818,7 +818,7 @@ function PortfolioCard({ portfolio, onSelect, onDelete, selected }) {
 }
 
 // ─── PORTFOLIO EDITOR ─────────────────────────────────────────────────────────
-function PortfolioEditor({ portfolio, onChange, onGoToSearch, overridesMap, saveOverride }) {
+function PortfolioEditor({ portfolio, onChange, onGoToSearch, onOpenDetail, overridesMap, saveOverride }) {
   const [mode, setMode] = useState("amount");
   const [scenarioMode, setScenarioMode] = useState("base");
   const totalMonthly = portfolio.holdings.reduce((s, h) => s + h.monthly, 0);
@@ -916,10 +916,17 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch, overridesMap, save
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => onOpenDetail(h)}
+                    style={{
+                      background: "none", border: "none", padding: 0, cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                      textAlign: "left", marginBottom: 0,
+                    }}
+                  >
                     <span style={{ fontWeight: 700, fontSize: 15, color: h.color, letterSpacing: "0.06em", fontFamily: "Georgia, 'Times New Roman', serif" }}>{h.symbol}</span>
                     <span style={{ fontSize: 12, color: T.textSecondary }}>{h.name?.substring(0, 35)}</span>
-                  </div>
+                  </button>
                   <div style={{ fontSize: 11, marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", ...NUM }}>
                     <span style={{ color: "#E8352A" }}>Pess.</span>
                     <EditableReturn value={getReturns(h.symbol, h.returns ?? {}, overridesMap).pessimistic ?? h.rate} color="#E8352A" fontSize={11}
@@ -1231,6 +1238,60 @@ export default function App() {
   const [activePage, setActivePage] = useState("search");
   const [searchKey, setSearchKey] = useState(0);
   const [overridesMap, setOverridesMap] = useState({});
+  const [detailStock, setDetailStock] = useState(null);
+
+  const openDetail = async (holding) => {
+    const stock = {
+      symbol: holding.symbol,
+      name: holding.name,
+      returns: holding.returns ?? { pessimistic: holding.rate, base: holding.rate, optimistic: holding.rate },
+      rate: holding.rate,
+      currentPrice: holding.currentPrice ?? null,
+      currency: holding.currency ?? "",
+      description: holding.description ?? "",
+      risk: holding.risk ?? null,
+      type: holding.type ?? null,
+      explanation: holding.explanation ?? null,
+    };
+    setDetailStock(stock);
+    window.history.pushState({ portfolioDetail: holding.symbol }, "");
+    if (user) {
+      try {
+        const { data } = await supabase
+          .from("stocks")
+          .select("*")
+          .eq("symbol", holding.symbol)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (data) {
+          setDetailStock((prev) => prev ? {
+            ...prev,
+            currentPrice: data.current_price ?? prev.currentPrice,
+            currency: data.currency ?? prev.currency,
+            description: data.description ?? prev.description,
+            risk: data.risk ?? prev.risk,
+            type: data.type ?? prev.type,
+            explanation: data.explanation ?? prev.explanation,
+          } : prev);
+        }
+      } catch {}
+    }
+  };
+
+  const closeDetail = () => {
+    setDetailStock(null);
+    if (window.history.state?.portfolioDetail) window.history.back();
+  };
+
+  useEffect(() => {
+    const handler = () => setDetailStock(null);
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
+
+  useEffect(() => {
+    if (activePage !== "portfolio") setDetailStock(null);
+  }, [activePage]);
 
   const loadAllOverrides = async (u) => {
     if (u) {
@@ -1399,6 +1460,7 @@ export default function App() {
     setSelectedPf(id);
     setSidebarOpen(false);
     setActivePage("portfolio");
+    setDetailStock(null);
   };
 
   return (
@@ -1567,24 +1629,50 @@ export default function App() {
 
         {activePage === "portfolio" && currentPf && (
           <div>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
-              <button
-                onClick={() => setActivePage("search")}
-                style={{
-                  background: T.primary, color: "#fff", border: "none",
-                  borderRadius: 3, padding: "10px 20px",
-                  fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: "'Syne', sans-serif",
-                  letterSpacing: "0.09em", textTransform: "uppercase",
-                }}
-              >+ Add asset</button>
-            </div>
-            <PortfolioEditor
-              portfolio={currentPf}
-              onChange={updatePf}
-              onGoToSearch={() => setActivePage("search")}
-              overridesMap={overridesMap}
-              saveOverride={saveOverride}
-            />
+            {detailStock ? (
+              <>
+                <button
+                  onClick={closeDetail}
+                  style={{
+                    background: "transparent", border: `1px solid ${T.border}`,
+                    borderRadius: 3, color: T.textSecondary,
+                    fontSize: 11, fontWeight: 700, padding: "8px 16px",
+                    cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                    letterSpacing: "0.08em", textTransform: "uppercase",
+                    marginBottom: 20, display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >← Back to portfolio</button>
+                <ExplorePanel
+                  stock={detailStock}
+                  onClose={closeDetail}
+                  overridesMap={overridesMap}
+                  saveOverride={saveOverride}
+                  resetOverride={resetOverride}
+                />
+              </>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
+                  <button
+                    onClick={() => setActivePage("search")}
+                    style={{
+                      background: T.primary, color: "#fff", border: "none",
+                      borderRadius: 3, padding: "10px 20px",
+                      fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                      letterSpacing: "0.09em", textTransform: "uppercase",
+                    }}
+                  >+ Add asset</button>
+                </div>
+                <PortfolioEditor
+                  portfolio={currentPf}
+                  onChange={updatePf}
+                  onGoToSearch={() => setActivePage("search")}
+                  onOpenDetail={openDetail}
+                  overridesMap={overridesMap}
+                  saveOverride={saveOverride}
+                />
+              </>
+            )}
           </div>
         )}
       </main>
