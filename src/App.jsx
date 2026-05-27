@@ -611,17 +611,22 @@ function ExplorePanel({ stock, onClose }) {
                     <span style={{ color, fontWeight: 700, fontSize: 20, ...NUM }}>%</span>
                   </div>
                 ) : (
-                  <div
-                    onClick={() => {
-                      console.log("[ExplorePanel] click on", key, "current editingField:", editingField);
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log("[ExplorePanel] click on", key, "editingField was:", editingField);
                       setEditingField(key);
                       setEditValue(String(returns[key]));
                     }}
                     title="Click to edit"
-                    style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1, ...NUM, cursor: "pointer" }}
+                    style={{
+                      fontSize: 26, fontWeight: 700, color, lineHeight: 1, ...NUM,
+                      cursor: "pointer", background: "transparent", border: "none",
+                      padding: 0, display: "block", width: "100%",
+                    }}
                   >
                     {returns[key] >= 0 ? "+" : ""}{returns[key]}%
-                  </div>
+                  </button>
                 )}
                 {isCustom && !isEditing && (
                   <div style={{ fontSize: 8, color, marginTop: 5, letterSpacing: "0.06em", fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>
