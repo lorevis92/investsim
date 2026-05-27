@@ -1425,7 +1425,7 @@ export default function App() {
               fontSize: 16, fontWeight: 800, color: T.primary,
               textTransform: "uppercase", letterSpacing: "0.10em",
               fontFamily: "'Syne', sans-serif",
-            }}>NVEST</span>
+            }}>NVESTPROVA</span>
           </div>
 
           {/* Nav tabs */}
