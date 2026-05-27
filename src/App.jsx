@@ -89,6 +89,49 @@ async function fetchStockInfo(query) {
   return res.json();
 }
 
+// ─── OVERRIDE PERSISTENCE ─────────────────────────────────────────────────────
+async function loadOverrides(symbol, user) {
+  if (user) {
+    try {
+      const { data } = await supabase
+        .from("stocks")
+        .select("user_overrides")
+        .eq("symbol", symbol)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data?.user_overrides) {
+        const { userId: _uid, ...rates } = data.user_overrides;
+        return rates;
+      }
+    } catch {}
+  } else {
+    try {
+      const saved = localStorage.getItem(`wisi_override_${symbol}`);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+  }
+  return null;
+}
+
+async function saveOverrides(symbol, overrides, user) {
+  if (user) {
+    try {
+      await supabase.from("stocks").upsert({
+        symbol,
+        user_id: user.id,
+        user_overrides: overrides ? { ...overrides, userId: user.id } : null,
+        updated_at: new Date().toISOString(),
+      });
+    } catch {}
+  } else {
+    if (overrides) {
+      localStorage.setItem(`wisi_override_${symbol}`, JSON.stringify(overrides));
+    } else {
+      localStorage.removeItem(`wisi_override_${symbol}`);
+    }
+  }
+}
+
 // ─── SMALL COMPONENTS ─────────────────────────────────────────────────────────
 function Badge({ children }) {
   return (
@@ -225,6 +268,7 @@ function ExplanationSection({ explanation }) {
 
 // ─── SEARCH PANEL ─────────────────────────────────────────────────────────────
 function SearchPanel({ onAdd, onExplore }) {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -243,6 +287,8 @@ function SearchPanel({ onAdd, onExplore }) {
         setError("Asset not found. Try a different name — e.g. Apple, S&P 500, Gold.");
       } else {
         setResult(data);
+        const saved = await loadOverrides(data.symbol, user);
+        setLocalReturns(saved);
       }
     } catch {
       setError("Something went wrong. Please try again in a moment.");
@@ -375,7 +421,7 @@ function SearchPanel({ onAdd, onExplore }) {
                 Annual return scenarios — 20–30 year benchmarks
               </div>
               {localReturns && (
-                <button onClick={() => setLocalReturns(null)}
+                <button onClick={() => { setLocalReturns(null); saveOverrides(result.symbol, null, user); }}
                   style={{ background: "transparent", border: "none", color: T.primary, fontSize: 10, fontWeight: 700, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif", padding: 0, textDecoration: "underline" }}>
                   Reset to AI estimate
                 </button>
@@ -394,7 +440,11 @@ function SearchPanel({ onAdd, onExplore }) {
                     color={color}
                     block
                     isCustom={localReturns?.[key] != null}
-                    onSave={(v) => setLocalReturns((prev) => ({ ...(prev ?? result.returns), [key]: v }))}
+                    onSave={(v) => {
+                      const newLR = { ...(localReturns ?? result.returns), [key]: v };
+                      setLocalReturns(newLR);
+                      saveOverrides(result.symbol, newLR, user);
+                    }}
                   />
                 </div>
               ))}
@@ -504,65 +554,18 @@ function ExplorePanel({ stock, onClose }) {
   const hasOverrides = overrides != null && Object.keys(overrides).length > 0;
 
   useEffect(() => {
-    const load = async () => {
-      if (user) {
-        try {
-          const { data } = await supabase
-            .from("stocks")
-            .select("user_overrides")
-            .eq("symbol", stock.symbol)
-            .eq("user_id", user.id)
-            .maybeSingle();
-          if (data?.user_overrides) {
-            const { userId: _uid, ...rates } = data.user_overrides;
-            setOverrides(rates);
-          }
-        } catch {}
-      } else {
-        try {
-          const saved = localStorage.getItem(`wisi_override_${stock.symbol}`);
-          if (saved) setOverrides(JSON.parse(saved));
-        } catch {}
-      }
-    };
-    load();
+    loadOverrides(stock.symbol, user).then((saved) => { if (saved) setOverrides(saved); });
   }, [stock.symbol, user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const persistOverrides = async (newOverrides) => {
-    if (user) {
-      try {
-        await supabase.from("stocks").upsert({
-          symbol: stock.symbol,
-          user_id: user.id,
-          user_overrides: { ...newOverrides, userId: user.id },
-          updated_at: new Date().toISOString(),
-        });
-      } catch {}
-    } else {
-      localStorage.setItem(`wisi_override_${stock.symbol}`, JSON.stringify(newOverrides));
-    }
-  };
-
-  const resetToAI = async () => {
-    setOverrides(null);
-    if (user) {
-      try {
-        await supabase.from("stocks").upsert({
-          symbol: stock.symbol,
-          user_id: user.id,
-          user_overrides: null,
-          updated_at: new Date().toISOString(),
-        });
-      } catch {}
-    } else {
-      localStorage.removeItem(`wisi_override_${stock.symbol}`);
-    }
-  };
 
   const saveOverride = (key, val) => {
     const newOv = { ...(overrides ?? {}), [key]: val };
     setOverrides(newOv);
-    persistOverrides(newOv);
+    saveOverrides(stock.symbol, newOv, user);
+  };
+
+  const resetToAI = () => {
+    setOverrides(null);
+    saveOverrides(stock.symbol, null, user);
   };
 
   const data = Array.from({ length: 31 }, (_, y) => ({
