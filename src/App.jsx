@@ -425,8 +425,12 @@ function ExplorePanel({ stock, onClose }) {
   const currency = stock.currency ?? "";
 
   const [overrides, setOverrides] = useState(null);
-  const [editingField, setEditingField] = useState(null);
-  const [editValue, setEditValue] = useState("");
+  const [editPess, setEditPess] = useState(false);
+  const [editBase, setEditBase] = useState(false);
+  const [editOpt,  setEditOpt]  = useState(false);
+  const [valPess, setValPess] = useState("");
+  const [valBase, setValBase] = useState("");
+  const [valOpt,  setValOpt]  = useState("");
 
   const returns = overrides ? { ...aiReturns, ...overrides } : aiReturns;
   const hasOverrides = overrides != null && Object.keys(overrides).length > 0;
@@ -487,20 +491,15 @@ function ExplorePanel({ stock, onClose }) {
     }
   };
 
-  const startEdit = (key) => {
-    setEditingField(key);
-    setEditValue(String(returns[key]));
-  };
-
-  const commitEdit = (key) => {
-    const num = parseFloat(editValue);
-    if (!isNaN(num) && num >= 0 && num <= 100) {
+  const save = (key, rawVal, setEdit) => {
+    const num = parseFloat(rawVal);
+    if (!isNaN(num) && num >= -100 && num <= 100) {
       const parsed = parseFloat(num.toFixed(1));
       const newOverrides = { ...(overrides ?? {}), [key]: parsed };
       setOverrides(newOverrides);
       persistOverrides(newOverrides);
     }
-    setEditingField(null);
+    setEdit(false);
   };
 
   const data = Array.from({ length: 31 }, (_, y) => ({
@@ -571,71 +570,76 @@ function ExplorePanel({ stock, onClose }) {
           )}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-          {[
-            { key: "pessimistic", label: "Pessimistic", color: "#E8352A", bg: "rgba(232,53,42,0.05)", brd: "rgba(232,53,42,0.15)" },
-            { key: "base",        label: "Base",        color: "#888888", bg: "rgba(136,136,136,0.04)", brd: "rgba(136,136,136,0.12)" },
-            { key: "optimistic",  label: "Optimistic",  color: "#00996A", bg: "rgba(0,153,106,0.05)", brd: "rgba(0,153,106,0.15)" },
-          ].map(({ key, label, color, bg, brd }) => {
-            const isCustom = overrides?.[key] != null;
-            const isEditing = editingField === key;
-            return (
-              <div key={key} style={{ background: bg, border: `1px solid ${brd}`, borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
-                <div style={{ fontSize: 9, color, fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-                  {label}
-                </div>
-                {isEditing ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
-                    <span style={{ color, fontWeight: 700, fontSize: 20, ...NUM }}>+</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.5}
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitEdit(key);
-                        if (e.key === "Escape") setEditingField(null);
-                      }}
-                      onBlur={() => commitEdit(key)}
-                      autoFocus
-                      style={{
-                        width: 58, textAlign: "center",
-                        border: `1.5px solid ${color}`, borderRadius: 3,
-                        background: "transparent", color,
-                        fontWeight: 700, fontSize: 20,
-                        outline: "none", padding: "2px 4px",
-                        fontFamily: "'DM Mono', monospace",
-                      }}
-                    />
-                    <span style={{ color, fontWeight: 700, fontSize: 20, ...NUM }}>%</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      console.log("[ExplorePanel] click on", key, "editingField was:", editingField);
-                      setEditingField(key);
-                      setEditValue(String(returns[key]));
-                    }}
-                    title="Click to edit"
-                    style={{
-                      fontSize: 26, fontWeight: 700, color, lineHeight: 1, ...NUM,
-                      cursor: "pointer", background: "transparent", border: "none",
-                      padding: 0, display: "block", width: "100%",
-                    }}
-                  >
-                    {returns[key] >= 0 ? "+" : ""}{returns[key]}%
-                  </button>
-                )}
-                {isCustom && !isEditing && (
-                  <div style={{ fontSize: 8, color, marginTop: 5, letterSpacing: "0.06em", fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>
-                    (custom)
-                  </div>
-                )}
-              </div>
-            );
-          })}
+
+          {/* PESSIMISTIC */}
+          <div style={{ background: "rgba(232,53,42,0.05)", border: "1px solid rgba(232,53,42,0.15)", borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#E8352A", fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Pessimistic</div>
+            {editPess ? (
+              <input
+                type="number" min={-100} max={100} step={0.5} autoFocus
+                value={valPess}
+                onChange={(e) => setValPess(e.target.value)}
+                onBlur={() => save("pessimistic", valPess, setEditPess)}
+                onKeyDown={(e) => { if (e.key === "Enter") save("pessimistic", valPess, setEditPess); if (e.key === "Escape") setEditPess(false); }}
+                style={{ width: 80, textAlign: "center", border: "1.5px solid #E8352A", borderRadius: 3, background: "transparent", color: "#E8352A", fontWeight: 700, fontSize: 20, outline: "none", padding: "2px 4px", fontFamily: "'DM Mono', monospace" }}
+              />
+            ) : (
+              <button onClick={() => { setValPess(String(returns.pessimistic)); setEditPess(true); }}
+                style={{ fontSize: 26, fontWeight: 700, color: "#E8352A", lineHeight: 1, fontFamily: "'DM Mono', monospace", cursor: "pointer", background: "transparent", border: "none", padding: 0, display: "block", width: "100%" }}>
+                {returns.pessimistic >= 0 ? "+" : ""}{returns.pessimistic}%
+              </button>
+            )}
+            {overrides?.pessimistic != null && !editPess && (
+              <div style={{ fontSize: 8, color: "#E8352A", marginTop: 5, fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>(custom)</div>
+            )}
+          </div>
+
+          {/* BASE */}
+          <div style={{ background: "rgba(136,136,136,0.04)", border: "1px solid rgba(136,136,136,0.12)", borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#888888", fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Base</div>
+            {editBase ? (
+              <input
+                type="number" min={-100} max={100} step={0.5} autoFocus
+                value={valBase}
+                onChange={(e) => setValBase(e.target.value)}
+                onBlur={() => save("base", valBase, setEditBase)}
+                onKeyDown={(e) => { if (e.key === "Enter") save("base", valBase, setEditBase); if (e.key === "Escape") setEditBase(false); }}
+                style={{ width: 80, textAlign: "center", border: "1.5px solid #888888", borderRadius: 3, background: "transparent", color: "#888888", fontWeight: 700, fontSize: 20, outline: "none", padding: "2px 4px", fontFamily: "'DM Mono', monospace" }}
+              />
+            ) : (
+              <button onClick={() => { setValBase(String(returns.base)); setEditBase(true); }}
+                style={{ fontSize: 26, fontWeight: 700, color: "#888888", lineHeight: 1, fontFamily: "'DM Mono', monospace", cursor: "pointer", background: "transparent", border: "none", padding: 0, display: "block", width: "100%" }}>
+                {returns.base >= 0 ? "+" : ""}{returns.base}%
+              </button>
+            )}
+            {overrides?.base != null && !editBase && (
+              <div style={{ fontSize: 8, color: "#888888", marginTop: 5, fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>(custom)</div>
+            )}
+          </div>
+
+          {/* OPTIMISTIC */}
+          <div style={{ background: "rgba(0,153,106,0.05)", border: "1px solid rgba(0,153,106,0.15)", borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: "#00996A", fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Optimistic</div>
+            {editOpt ? (
+              <input
+                type="number" min={-100} max={100} step={0.5} autoFocus
+                value={valOpt}
+                onChange={(e) => setValOpt(e.target.value)}
+                onBlur={() => save("optimistic", valOpt, setEditOpt)}
+                onKeyDown={(e) => { if (e.key === "Enter") save("optimistic", valOpt, setEditOpt); if (e.key === "Escape") setEditOpt(false); }}
+                style={{ width: 80, textAlign: "center", border: "1.5px solid #00996A", borderRadius: 3, background: "transparent", color: "#00996A", fontWeight: 700, fontSize: 20, outline: "none", padding: "2px 4px", fontFamily: "'DM Mono', monospace" }}
+              />
+            ) : (
+              <button onClick={() => { setValOpt(String(returns.optimistic)); setEditOpt(true); }}
+                style={{ fontSize: 26, fontWeight: 700, color: "#00996A", lineHeight: 1, fontFamily: "'DM Mono', monospace", cursor: "pointer", background: "transparent", border: "none", padding: 0, display: "block", width: "100%" }}>
+                {returns.optimistic >= 0 ? "+" : ""}{returns.optimistic}%
+              </button>
+            )}
+            {overrides?.optimistic != null && !editOpt && (
+              <div style={{ fontSize: 8, color: "#00996A", marginTop: 5, fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>(custom)</div>
+            )}
+          </div>
+
         </div>
       </div>
 
@@ -1425,7 +1429,7 @@ export default function App() {
               fontSize: 16, fontWeight: 800, color: T.primary,
               textTransform: "uppercase", letterSpacing: "0.10em",
               fontFamily: "'Syne', sans-serif",
-            }}>NVESTPROVA</span>
+            }}>NVEST</span>
           </div>
 
           {/* Nav tabs */}
