@@ -113,6 +113,65 @@ function RiskBadge({ risk }) {
   );
 }
 
+// ─── EDITABLE RETURN ──────────────────────────────────────────────────────────
+function EditableReturn({ value, color, onSave, isCustom = false, fontSize = 26, block = false }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState("");
+
+  const commit = () => {
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= -100 && num <= 100) {
+      onSave(parseFloat(num.toFixed(1)));
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        type="number" min={-100} max={100} step={0.5} autoFocus
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
+        style={{
+          width: fontSize >= 20 ? 80 : 60, textAlign: "center",
+          border: `1.5px solid ${color}`, borderRadius: 3,
+          background: "transparent", color,
+          fontWeight: 700, fontSize,
+          outline: "none", padding: "2px 4px",
+          fontFamily: "'DM Mono', monospace",
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => { setVal(String(value)); setEditing(true); }}
+        style={{
+          fontSize, fontWeight: 700, color, lineHeight: 1,
+          fontFamily: "'DM Mono', monospace", cursor: "pointer",
+          background: "transparent", border: "none", padding: 0,
+          display: block ? "block" : "inline",
+          width: block ? "100%" : "auto",
+        }}
+      >
+        {value >= 0 ? "+" : ""}{value}%
+      </button>
+      {isCustom && (
+        <div style={{
+          fontSize: 8, color, fontFamily: "'Syne', sans-serif", opacity: 0.7,
+          marginTop: block ? 5 : 0, display: block ? "block" : "inline", marginLeft: block ? 0 : 3,
+        }}>
+          (custom)
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── EXPLANATION SECTION ──────────────────────────────────────────────────────
 function ExplanationSection({ explanation }) {
   const [open, setOpen] = useState(false);
@@ -171,10 +230,13 @@ function SearchPanel({ onAdd, onExplore }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [monthly, setMonthly] = useState(300);
+  const [localReturns, setLocalReturns] = useState(null);
+
+  const effectiveReturns = localReturns ?? result?.returns ?? {};
 
   const search = async () => {
     if (!query.trim()) return;
-    setLoading(true); setResult(null); setError(null);
+    setLoading(true); setResult(null); setError(null); setLocalReturns(null);
     try {
       const data = await fetchStockInfo(query);
       if (data.symbol === "NOT_FOUND" || !data.returns?.base) {
@@ -308,20 +370,32 @@ function SearchPanel({ onAdd, onExplore }) {
             background: T.surface, border: `1px solid ${T.border}`,
             borderRadius: 4, padding: "16px 18px", marginBottom: 22,
           }}>
-            <div style={{ fontSize: 10, color: T.textMuted, marginBottom: 14, letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>
-              Annual return scenarios — 20–30 year benchmarks
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>
+                Annual return scenarios — 20–30 year benchmarks
+              </div>
+              {localReturns && (
+                <button onClick={() => setLocalReturns(null)}
+                  style={{ background: "transparent", border: "none", color: T.primary, fontSize: 10, fontWeight: 700, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif", padding: 0, textDecoration: "underline" }}>
+                  Reset to AI estimate
+                </button>
+              )}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
               {[
-                { key: "pessimistic", label: "Pessimistic", color: "#E8352A", bg: "rgba(232,53,42,0.05)", border: "rgba(232,53,42,0.15)" },
-                { key: "base",        label: "Base",        color: "#888888", bg: "rgba(136,136,136,0.04)", border: "rgba(136,136,136,0.12)" },
-                { key: "optimistic",  label: "Optimistic",  color: "#00996A", bg: "rgba(0,153,106,0.05)", border: "rgba(0,153,106,0.15)" },
-              ].map(({ key, label, color, bg, border }) => (
-                <div key={key} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
+                { key: "pessimistic", label: "Pessimistic", color: "#E8352A", bg: "rgba(232,53,42,0.05)", brd: "rgba(232,53,42,0.15)" },
+                { key: "base",        label: "Base",        color: "#888888", bg: "rgba(136,136,136,0.04)", brd: "rgba(136,136,136,0.12)" },
+                { key: "optimistic",  label: "Optimistic",  color: "#00996A", bg: "rgba(0,153,106,0.05)", brd: "rgba(0,153,106,0.15)" },
+              ].map(({ key, label, color, bg, brd }) => (
+                <div key={key} style={{ background: bg, border: `1px solid ${brd}`, borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
                   <div style={{ fontSize: 9, color, fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>{label}</div>
-                  <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1, ...NUM }}>
-                    +{result.returns[key]}%
-                  </div>
+                  <EditableReturn
+                    value={effectiveReturns[key]}
+                    color={color}
+                    block
+                    isCustom={localReturns?.[key] != null}
+                    onSave={(v) => setLocalReturns((prev) => ({ ...(prev ?? result.returns), [key]: v }))}
+                  />
                 </div>
               ))}
             </div>
@@ -350,7 +424,7 @@ function SearchPanel({ onAdd, onExplore }) {
           {/* Quick projections */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 22 }}>
             {[10, 20, 30].map((y) => {
-              const fv = calcDCA(monthly, result.returns.base / 100, y);
+              const fv = calcDCA(monthly, effectiveReturns.base / 100, y);
               const inv = monthly * 12 * y;
               return (
                 <div key={y} style={{
@@ -374,7 +448,7 @@ function SearchPanel({ onAdd, onExplore }) {
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 22 }}>
             <button
-              onClick={() => onAdd({ ...result, monthly, color: CHART_COLORS[Math.floor(Math.random() * CHART_COLORS.length)], rate: result.returns.base })}
+              onClick={() => onAdd({ ...result, returns: effectiveReturns, monthly, color: CHART_COLORS[Math.floor(Math.random() * CHART_COLORS.length)], rate: effectiveReturns.base })}
               style={{
                 flex: 1, minWidth: 140, background: T.primary, color: "#fff",
                 border: "none", borderRadius: 3, padding: "14px 16px",
@@ -385,7 +459,7 @@ function SearchPanel({ onAdd, onExplore }) {
               Add to portfolio
             </button>
             <button
-              onClick={() => onExplore(result)}
+              onClick={() => onExplore({ ...result, returns: effectiveReturns })}
               style={{
                 flex: 1, minWidth: 140, background: "transparent", color: T.primary,
                 border: `1.5px solid ${T.primary}`, borderRadius: 3, padding: "14px 16px",
@@ -425,12 +499,6 @@ function ExplorePanel({ stock, onClose }) {
   const currency = stock.currency ?? "";
 
   const [overrides, setOverrides] = useState(null);
-  const [editPess, setEditPess] = useState(false);
-  const [editBase, setEditBase] = useState(false);
-  const [editOpt,  setEditOpt]  = useState(false);
-  const [valPess, setValPess] = useState("");
-  const [valBase, setValBase] = useState("");
-  const [valOpt,  setValOpt]  = useState("");
 
   const returns = overrides ? { ...aiReturns, ...overrides } : aiReturns;
   const hasOverrides = overrides != null && Object.keys(overrides).length > 0;
@@ -491,15 +559,10 @@ function ExplorePanel({ stock, onClose }) {
     }
   };
 
-  const save = (key, rawVal, setEdit) => {
-    const num = parseFloat(rawVal);
-    if (!isNaN(num) && num >= -100 && num <= 100) {
-      const parsed = parseFloat(num.toFixed(1));
-      const newOverrides = { ...(overrides ?? {}), [key]: parsed };
-      setOverrides(newOverrides);
-      persistOverrides(newOverrides);
-    }
-    setEdit(false);
+  const saveOverride = (key, val) => {
+    const newOv = { ...(overrides ?? {}), [key]: val };
+    setOverrides(newOv);
+    persistOverrides(newOv);
   };
 
   const data = Array.from({ length: 31 }, (_, y) => ({
@@ -570,76 +633,22 @@ function ExplorePanel({ stock, onClose }) {
           )}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-
-          {/* PESSIMISTIC */}
-          <div style={{ background: "rgba(232,53,42,0.05)", border: "1px solid rgba(232,53,42,0.15)", borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
-            <div style={{ fontSize: 9, color: "#E8352A", fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Pessimistic</div>
-            {editPess ? (
-              <input
-                type="number" min={-100} max={100} step={0.5} autoFocus
-                value={valPess}
-                onChange={(e) => setValPess(e.target.value)}
-                onBlur={() => save("pessimistic", valPess, setEditPess)}
-                onKeyDown={(e) => { if (e.key === "Enter") save("pessimistic", valPess, setEditPess); if (e.key === "Escape") setEditPess(false); }}
-                style={{ width: 80, textAlign: "center", border: "1.5px solid #E8352A", borderRadius: 3, background: "transparent", color: "#E8352A", fontWeight: 700, fontSize: 20, outline: "none", padding: "2px 4px", fontFamily: "'DM Mono', monospace" }}
+          {[
+            { key: "pessimistic", label: "Pessimistic", color: "#E8352A", bg: "rgba(232,53,42,0.05)", brd: "rgba(232,53,42,0.15)" },
+            { key: "base",        label: "Base",        color: "#888888", bg: "rgba(136,136,136,0.04)", brd: "rgba(136,136,136,0.12)" },
+            { key: "optimistic",  label: "Optimistic",  color: "#00996A", bg: "rgba(0,153,106,0.05)", brd: "rgba(0,153,106,0.15)" },
+          ].map(({ key, label, color, bg, brd }) => (
+            <div key={key} style={{ background: bg, border: `1px solid ${brd}`, borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
+              <div style={{ fontSize: 9, color, fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>{label}</div>
+              <EditableReturn
+                value={returns[key]}
+                color={color}
+                block
+                isCustom={overrides?.[key] != null}
+                onSave={(v) => saveOverride(key, v)}
               />
-            ) : (
-              <button onClick={() => { setValPess(String(returns.pessimistic)); setEditPess(true); }}
-                style={{ fontSize: 26, fontWeight: 700, color: "#E8352A", lineHeight: 1, fontFamily: "'DM Mono', monospace", cursor: "pointer", background: "transparent", border: "none", padding: 0, display: "block", width: "100%" }}>
-                {returns.pessimistic >= 0 ? "+" : ""}{returns.pessimistic}%
-              </button>
-            )}
-            {overrides?.pessimistic != null && !editPess && (
-              <div style={{ fontSize: 8, color: "#E8352A", marginTop: 5, fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>(custom)</div>
-            )}
-          </div>
-
-          {/* BASE */}
-          <div style={{ background: "rgba(136,136,136,0.04)", border: "1px solid rgba(136,136,136,0.12)", borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
-            <div style={{ fontSize: 9, color: "#888888", fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Base</div>
-            {editBase ? (
-              <input
-                type="number" min={-100} max={100} step={0.5} autoFocus
-                value={valBase}
-                onChange={(e) => setValBase(e.target.value)}
-                onBlur={() => save("base", valBase, setEditBase)}
-                onKeyDown={(e) => { if (e.key === "Enter") save("base", valBase, setEditBase); if (e.key === "Escape") setEditBase(false); }}
-                style={{ width: 80, textAlign: "center", border: "1.5px solid #888888", borderRadius: 3, background: "transparent", color: "#888888", fontWeight: 700, fontSize: 20, outline: "none", padding: "2px 4px", fontFamily: "'DM Mono', monospace" }}
-              />
-            ) : (
-              <button onClick={() => { setValBase(String(returns.base)); setEditBase(true); }}
-                style={{ fontSize: 26, fontWeight: 700, color: "#888888", lineHeight: 1, fontFamily: "'DM Mono', monospace", cursor: "pointer", background: "transparent", border: "none", padding: 0, display: "block", width: "100%" }}>
-                {returns.base >= 0 ? "+" : ""}{returns.base}%
-              </button>
-            )}
-            {overrides?.base != null && !editBase && (
-              <div style={{ fontSize: 8, color: "#888888", marginTop: 5, fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>(custom)</div>
-            )}
-          </div>
-
-          {/* OPTIMISTIC */}
-          <div style={{ background: "rgba(0,153,106,0.05)", border: "1px solid rgba(0,153,106,0.15)", borderRadius: 4, padding: "12px 8px", textAlign: "center" }}>
-            <div style={{ fontSize: 9, color: "#00996A", fontWeight: 700, marginBottom: 8, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>Optimistic</div>
-            {editOpt ? (
-              <input
-                type="number" min={-100} max={100} step={0.5} autoFocus
-                value={valOpt}
-                onChange={(e) => setValOpt(e.target.value)}
-                onBlur={() => save("optimistic", valOpt, setEditOpt)}
-                onKeyDown={(e) => { if (e.key === "Enter") save("optimistic", valOpt, setEditOpt); if (e.key === "Escape") setEditOpt(false); }}
-                style={{ width: 80, textAlign: "center", border: "1.5px solid #00996A", borderRadius: 3, background: "transparent", color: "#00996A", fontWeight: 700, fontSize: 20, outline: "none", padding: "2px 4px", fontFamily: "'DM Mono', monospace" }}
-              />
-            ) : (
-              <button onClick={() => { setValOpt(String(returns.optimistic)); setEditOpt(true); }}
-                style={{ fontSize: 26, fontWeight: 700, color: "#00996A", lineHeight: 1, fontFamily: "'DM Mono', monospace", cursor: "pointer", background: "transparent", border: "none", padding: 0, display: "block", width: "100%" }}>
-                {returns.optimistic >= 0 ? "+" : ""}{returns.optimistic}%
-              </button>
-            )}
-            {overrides?.optimistic != null && !editOpt && (
-              <div style={{ fontSize: 8, color: "#00996A", marginTop: 5, fontFamily: "'Syne', sans-serif", opacity: 0.7 }}>(custom)</div>
-            )}
-          </div>
-
+            </div>
+          ))}
         </div>
       </div>
 
@@ -836,6 +845,16 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
   const updateHolding = (symbol, field, val) =>
     onChange({ ...portfolio, holdings: portfolio.holdings.map((h) => h.symbol === symbol ? { ...h, [field]: val } : h) });
 
+  const updateReturn = (symbol, key, val) => {
+    const h = portfolio.holdings.find((hh) => hh.symbol === symbol);
+    const cur = {
+      pessimistic: h.returns?.pessimistic ?? h.rate,
+      base:        h.returns?.base        ?? h.rate,
+      optimistic:  h.returns?.optimistic  ?? h.rate,
+    };
+    updateHolding(symbol, "returns", { ...cur, [key]: val });
+  };
+
   const removeHolding = (symbol) =>
     onChange({ ...portfolio, holdings: portfolio.holdings.filter((h) => h.symbol !== symbol) });
 
@@ -928,12 +947,18 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
                     <span style={{ fontWeight: 700, fontSize: 15, color: h.color, letterSpacing: "0.06em", fontFamily: "Georgia, 'Times New Roman', serif" }}>{h.symbol}</span>
                     <span style={{ fontSize: 12, color: T.textSecondary }}>{h.name?.substring(0, 35)}</span>
                   </div>
-                  <div style={{ fontSize: 11, marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap", ...NUM }}>
-                    <span style={{ color: "#E8352A" }}>Pess. +{h.returns?.pessimistic ?? h.rate}%</span>
+                  <div style={{ fontSize: 11, marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", ...NUM }}>
+                    <span style={{ color: "#E8352A" }}>Pess.</span>
+                    <EditableReturn value={h.returns?.pessimistic ?? h.rate} color="#E8352A" fontSize={11}
+                      onSave={(v) => updateReturn(h.symbol, "pessimistic", v)} />
                     <span style={{ color: T.textMuted }}>·</span>
-                    <span style={{ color: "#888888" }}>Base +{h.returns?.base ?? h.rate}%</span>
+                    <span style={{ color: "#888888" }}>Base</span>
+                    <EditableReturn value={h.returns?.base ?? h.rate} color="#888888" fontSize={11}
+                      onSave={(v) => updateReturn(h.symbol, "base", v)} />
                     <span style={{ color: T.textMuted }}>·</span>
-                    <span style={{ color: "#00996A" }}>Opt. +{h.returns?.optimistic ?? h.rate}%</span>
+                    <span style={{ color: "#00996A" }}>Opt.</span>
+                    <EditableReturn value={h.returns?.optimistic ?? h.rate} color="#00996A" fontSize={11}
+                      onSave={(v) => updateReturn(h.symbol, "optimistic", v)} />
                   </div>
                 </div>
                 <button
