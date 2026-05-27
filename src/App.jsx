@@ -529,6 +529,117 @@ const SCENARIO_META = [
   { key: "optimistic",  label: "Optimistic",  color: "#00996A" },
 ];
 
+// ─── PRICE HISTORY CHART ──────────────────────────────────────────────────────
+function PriceHistoryChart({ symbol, currency }) {
+  const [histData, setHistData] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setHistData(null);
+    setError(false);
+    fetch("/api/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.error || !json.data?.length) setError(true);
+        else setHistData(json.data);
+      })
+      .catch(() => setError(true));
+  }, [symbol]);
+
+  if (error) {
+    return (
+      <div style={{
+        height: 40, display: "flex", alignItems: "center", paddingLeft: 2,
+        marginBottom: 22,
+      }}>
+        <span style={{ fontSize: 11, color: T.textMuted, fontFamily: "'Syne', sans-serif", letterSpacing: "0.06em" }}>
+          Historical data not available
+        </span>
+      </div>
+    );
+  }
+
+  if (!histData) {
+    return (
+      <div style={{
+        height: 180, background: T.surface, borderRadius: 4,
+        border: `1px solid ${T.border}`, marginBottom: 22,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <span style={{ fontSize: 11, color: T.textMuted, fontFamily: "'Syne', sans-serif", letterSpacing: "0.06em" }}>
+          Loading price history…
+        </span>
+      </div>
+    );
+  }
+
+  const prices = histData.map((d) => d.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const cur = currency || "";
+
+  const fmtHistPrice = (v) =>
+    v >= 1000
+      ? v.toLocaleString("en-CH", { maximumFractionDigits: 0 })
+      : v.toLocaleString("en-CH", { maximumFractionDigits: 2 });
+
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif", marginBottom: 10 }}>
+        Price history — last 30 years
+      </div>
+      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 4, padding: "12px 4px 4px" }}>
+        <ResponsiveContainer width="100%" height={180}>
+          <AreaChart data={histData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="ph-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={T.primary} stopOpacity={0.18} />
+                <stop offset="95%" stopColor={T.primary} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
+            <XAxis
+              dataKey="date"
+              stroke={T.border}
+              tick={{ fontSize: 9, fill: T.textMuted, fontFamily: "'DM Mono'" }}
+              tickFormatter={(v) => v.slice(0, 4)}
+              interval="preserveStartEnd"
+              minTickGap={48}
+            />
+            <YAxis
+              stroke={T.border}
+              tick={{ fontSize: 9, fill: T.textMuted, fontFamily: "'DM Mono'" }}
+              tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v.toFixed(0)}
+              width={44}
+            />
+            <Tooltip
+              contentStyle={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 4, fontSize: 11, fontFamily: "'DM Mono'" }}
+              formatter={(v) => [`${cur} ${fmtHistPrice(v)}`, "Price"]}
+              labelFormatter={(l) => {
+                const [y, m] = l.split("-");
+                return new Date(+y, +m - 1).toLocaleString("en", { month: "short", year: "numeric" });
+              }}
+            />
+            <Area type="monotone" dataKey="price" stroke={T.primary} fill="url(#ph-grad)" strokeWidth={1.5} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{ display: "flex", gap: 24, marginTop: 8 }}>
+        <span style={{ fontSize: 11, color: T.textMuted, ...NUM }}>
+          Low: <span style={{ color: T.text, fontWeight: 700 }}>{cur} {fmtHistPrice(minPrice)}</span>
+        </span>
+        <span style={{ fontSize: 11, color: T.textMuted, ...NUM }}>
+          High: <span style={{ color: T.green, fontWeight: 700 }}>{cur} {fmtHistPrice(maxPrice)}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── EXPLORE PANEL ────────────────────────────────────────────────────────────
 const PRICE_YEARS = [1, 3, 5, 10, 15, 20];
 
@@ -571,6 +682,9 @@ function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverrid
           style={{ background: "transparent", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 4 }}
         >×</button>
       </div>
+
+      {/* Price history chart */}
+      <PriceHistoryChart symbol={stock.symbol} currency={currency} />
 
       {/* Monthly slider */}
       <div style={{ marginBottom: 22 }}>
