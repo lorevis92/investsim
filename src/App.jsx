@@ -78,6 +78,10 @@ const buildChartData = (holdings, years = 30) =>
 
 const MILESTONES = [10, 15, 20, 25, 30];
 
+const getReturns = (symbol, aiReturns, overridesMap) => ({
+  ...aiReturns, ...(overridesMap[symbol] ?? {}),
+});
+
 // ─── AI FETCH ─────────────────────────────────────────────────────────────────
 async function fetchStockInfo(query) {
   const res = await fetch("/api/search", {
@@ -267,28 +271,25 @@ function ExplanationSection({ explanation }) {
 }
 
 // ─── SEARCH PANEL ─────────────────────────────────────────────────────────────
-function SearchPanel({ onAdd, onExplore }) {
-  const { user } = useAuth();
+function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverride }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [monthly, setMonthly] = useState(300);
-  const [localReturns, setLocalReturns] = useState(null);
 
-  const effectiveReturns = localReturns ?? result?.returns ?? {};
+  const effectiveReturns = result ? getReturns(result.symbol, result.returns, overridesMap) : {};
+  const symbolOverrides = result ? (overridesMap[result.symbol] ?? null) : null;
 
   const search = async () => {
     if (!query.trim()) return;
-    setLoading(true); setResult(null); setError(null); setLocalReturns(null);
+    setLoading(true); setResult(null); setError(null);
     try {
       const data = await fetchStockInfo(query);
       if (data.symbol === "NOT_FOUND" || !data.returns?.base) {
         setError("Asset not found. Try a different name — e.g. Apple, S&P 500, Gold.");
       } else {
         setResult(data);
-        const saved = await loadOverrides(data.symbol, user);
-        setLocalReturns(saved);
       }
     } catch {
       setError("Something went wrong. Please try again in a moment.");
@@ -420,8 +421,8 @@ function SearchPanel({ onAdd, onExplore }) {
               <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>
                 Annual return scenarios — 20–30 year benchmarks
               </div>
-              {localReturns && (
-                <button onClick={() => { setLocalReturns(null); saveOverrides(result.symbol, null, user); }}
+              {symbolOverrides && (
+                <button onClick={() => resetOverride(result.symbol)}
                   style={{ background: "transparent", border: "none", color: T.primary, fontSize: 10, fontWeight: 700, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif", padding: 0, textDecoration: "underline" }}>
                   Reset to AI estimate
                 </button>
@@ -439,12 +440,8 @@ function SearchPanel({ onAdd, onExplore }) {
                     value={effectiveReturns[key]}
                     color={color}
                     block
-                    isCustom={localReturns?.[key] != null}
-                    onSave={(v) => {
-                      const newLR = { ...(localReturns ?? result.returns), [key]: v };
-                      setLocalReturns(newLR);
-                      saveOverrides(result.symbol, newLR, user);
-                    }}
+                    isCustom={symbolOverrides?.[key] != null}
+                    onSave={(v) => saveOverride(result.symbol, key, v)}
                   />
                 </div>
               ))}
@@ -541,32 +538,15 @@ function fmtPrice(v) {
   return v.toLocaleString("en-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function ExplorePanel({ stock, onClose }) {
-  const { user } = useAuth();
+function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverride }) {
   const [monthly, setMonthly] = useState(500);
   const aiReturns = stock.returns ?? { pessimistic: stock.rate, base: stock.rate, optimistic: stock.rate };
   const price = stock.currentPrice;
   const currency = stock.currency ?? "";
 
-  const [overrides, setOverrides] = useState(null);
-
-  const returns = overrides ? { ...aiReturns, ...overrides } : aiReturns;
-  const hasOverrides = overrides != null && Object.keys(overrides).length > 0;
-
-  useEffect(() => {
-    loadOverrides(stock.symbol, user).then((saved) => { if (saved) setOverrides(saved); });
-  }, [stock.symbol, user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const saveOverride = (key, val) => {
-    const newOv = { ...(overrides ?? {}), [key]: val };
-    setOverrides(newOv);
-    saveOverrides(stock.symbol, newOv, user);
-  };
-
-  const resetToAI = () => {
-    setOverrides(null);
-    saveOverrides(stock.symbol, null, user);
-  };
+  const returns = getReturns(stock.symbol, aiReturns, overridesMap);
+  const symbolOverrides = overridesMap[stock.symbol] ?? null;
+  const hasOverrides = symbolOverrides != null && Object.keys(symbolOverrides).length > 0;
 
   const data = Array.from({ length: 31 }, (_, y) => ({
     year: y,
@@ -623,7 +603,7 @@ function ExplorePanel({ stock, onClose }) {
           </div>
           {hasOverrides && (
             <button
-              onClick={resetToAI}
+              onClick={() => resetOverride(stock.symbol)}
               style={{
                 background: "transparent", border: "none", color: T.primary,
                 fontSize: 10, fontWeight: 700, cursor: "pointer",
@@ -647,8 +627,8 @@ function ExplorePanel({ stock, onClose }) {
                 value={returns[key]}
                 color={color}
                 block
-                isCustom={overrides?.[key] != null}
-                onSave={(v) => saveOverride(key, v)}
+                isCustom={symbolOverrides?.[key] != null}
+                onSave={(v) => saveOverride(stock.symbol, key, v)}
               />
             </div>
           ))}
@@ -838,25 +818,15 @@ function PortfolioCard({ portfolio, onSelect, onDelete, selected }) {
 }
 
 // ─── PORTFOLIO EDITOR ─────────────────────────────────────────────────────────
-function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
+function PortfolioEditor({ portfolio, onChange, onGoToSearch, overridesMap, saveOverride }) {
   const [mode, setMode] = useState("amount");
   const [scenarioMode, setScenarioMode] = useState("base");
   const totalMonthly = portfolio.holdings.reduce((s, h) => s + h.monthly, 0);
 
-  const scenarioRate = (h) => h.returns?.[scenarioMode] ?? h.rate;
+  const scenarioRate = (h) => getReturns(h.symbol, h.returns ?? {}, overridesMap)[scenarioMode] ?? h.rate;
 
   const updateHolding = (symbol, field, val) =>
     onChange({ ...portfolio, holdings: portfolio.holdings.map((h) => h.symbol === symbol ? { ...h, [field]: val } : h) });
-
-  const updateReturn = (symbol, key, val) => {
-    const h = portfolio.holdings.find((hh) => hh.symbol === symbol);
-    const cur = {
-      pessimistic: h.returns?.pessimistic ?? h.rate,
-      base:        h.returns?.base        ?? h.rate,
-      optimistic:  h.returns?.optimistic  ?? h.rate,
-    };
-    updateHolding(symbol, "returns", { ...cur, [key]: val });
-  };
 
   const removeHolding = (symbol) =>
     onChange({ ...portfolio, holdings: portfolio.holdings.filter((h) => h.symbol !== symbol) });
@@ -952,16 +922,19 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch }) {
                   </div>
                   <div style={{ fontSize: 11, marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", ...NUM }}>
                     <span style={{ color: "#E8352A" }}>Pess.</span>
-                    <EditableReturn value={h.returns?.pessimistic ?? h.rate} color="#E8352A" fontSize={11}
-                      onSave={(v) => updateReturn(h.symbol, "pessimistic", v)} />
+                    <EditableReturn value={getReturns(h.symbol, h.returns ?? {}, overridesMap).pessimistic ?? h.rate} color="#E8352A" fontSize={11}
+                      isCustom={overridesMap[h.symbol]?.pessimistic != null}
+                      onSave={(v) => saveOverride(h.symbol, "pessimistic", v)} />
                     <span style={{ color: T.textMuted }}>·</span>
                     <span style={{ color: "#888888" }}>Base</span>
-                    <EditableReturn value={h.returns?.base ?? h.rate} color="#888888" fontSize={11}
-                      onSave={(v) => updateReturn(h.symbol, "base", v)} />
+                    <EditableReturn value={getReturns(h.symbol, h.returns ?? {}, overridesMap).base ?? h.rate} color="#888888" fontSize={11}
+                      isCustom={overridesMap[h.symbol]?.base != null}
+                      onSave={(v) => saveOverride(h.symbol, "base", v)} />
                     <span style={{ color: T.textMuted }}>·</span>
                     <span style={{ color: "#00996A" }}>Opt.</span>
-                    <EditableReturn value={h.returns?.optimistic ?? h.rate} color="#00996A" fontSize={11}
-                      onSave={(v) => updateReturn(h.symbol, "optimistic", v)} />
+                    <EditableReturn value={getReturns(h.symbol, h.returns ?? {}, overridesMap).optimistic ?? h.rate} color="#00996A" fontSize={11}
+                      isCustom={overridesMap[h.symbol]?.optimistic != null}
+                      onSave={(v) => saveOverride(h.symbol, "optimistic", v)} />
                   </div>
                 </div>
                 <button
@@ -1257,6 +1230,57 @@ export default function App() {
   const [addModal, setAddModal] = useState({ open: false, stock: null });
   const [activePage, setActivePage] = useState("search");
   const [searchKey, setSearchKey] = useState(0);
+  const [overridesMap, setOverridesMap] = useState({});
+
+  const loadAllOverrides = async (u) => {
+    if (u) {
+      try {
+        const { data } = await supabase
+          .from("stocks")
+          .select("symbol, user_overrides")
+          .eq("user_id", u.id)
+          .not("user_overrides", "is", null);
+        if (data?.length) {
+          const map = {};
+          data.forEach(({ symbol, user_overrides }) => {
+            const { userId: _uid, ...rates } = user_overrides;
+            if (Object.keys(rates).length) map[symbol] = rates;
+          });
+          setOverridesMap(map);
+        }
+      } catch {}
+    } else {
+      const map = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith("wisi_override_")) {
+          try {
+            const sym = k.replace("wisi_override_", "");
+            const val = JSON.parse(localStorage.getItem(k));
+            if (val) map[sym] = val;
+          } catch {}
+        }
+      }
+      setOverridesMap(map);
+    }
+  };
+
+  const saveOverride = (symbol, key, value) => {
+    setOverridesMap((prev) => {
+      const cur = prev[symbol] ?? {};
+      const updated = { ...prev, [symbol]: { ...cur, [key]: value } };
+      saveOverrides(symbol, updated[symbol], user);
+      return updated;
+    });
+  };
+
+  const resetOverride = (symbol) => {
+    setOverridesMap((prev) => {
+      const { [symbol]: _, ...rest } = prev;
+      saveOverrides(symbol, null, user);
+      return rest;
+    });
+  };
 
   const goHome = () => {
     setActivePage("search");
@@ -1297,11 +1321,14 @@ export default function App() {
     console.log("[investsim] user effect → user:", user?.email ?? null);
     if (user) {
       loadPortfolios(user.id);
+      loadAllOverrides(user);
     } else {
       canSaveRef.current = false;
       _id = 1;
       setPortfolios([makePortfolio()]);
       setSelectedPf(1);
+      setOverridesMap({});
+      loadAllOverrides(null);
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1518,12 +1545,21 @@ export default function App() {
           <>
             <SearchPanel
               key={searchKey}
+              overridesMap={overridesMap}
+              saveOverride={saveOverride}
+              resetOverride={resetOverride}
               onAdd={(stock) => setAddModal({ open: true, stock })}
               onExplore={(s) => setExploreStock(s)}
             />
             {exploreStock && (
               <div style={{ marginTop: 18 }}>
-                <ExplorePanel stock={exploreStock} onClose={() => setExploreStock(null)} />
+                <ExplorePanel
+                  stock={exploreStock}
+                  onClose={() => setExploreStock(null)}
+                  overridesMap={overridesMap}
+                  saveOverride={saveOverride}
+                  resetOverride={resetOverride}
+                />
               </div>
             )}
           </>
@@ -1546,6 +1582,8 @@ export default function App() {
               portfolio={currentPf}
               onChange={updatePf}
               onGoToSearch={() => setActivePage("search")}
+              overridesMap={overridesMap}
+              saveOverride={saveOverride}
             />
           </div>
         )}
