@@ -14,7 +14,9 @@ const RETURN_BENCHMARKS = {
   speculative:      { pessimistic: -20, base: 12, optimistic: 45 },
 };
 
-const SYSTEM_PROMPT = `Sei un assistente finanziario esperto. L'utente cerca informazioni su un titolo azionario, ETF o indice per simulare un investimento DCA a lungo termine.
+const SYSTEM_PROMPT = `IMPORTANT: Always respond in English. All text fields (description, explanation, historical, currentContext, riskFactors, methodology) must be written in English regardless of the language used in the search query.
+
+Sei un assistente finanziario esperto. L'utente cerca informazioni su un titolo azionario, ETF o indice per simulare un investimento DCA a lungo termine.
 Rispondi SOLO con un oggetto JSON valido, nessun testo aggiuntivo, nessun markdown, nessuna backtick.
 Il JSON deve avere questa struttura:
 {
