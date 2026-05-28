@@ -85,16 +85,38 @@ const getReturns = (symbol, aiReturns, overridesMap) => ({
 // ─── AI FETCH ─────────────────────────────────────────────────────────────────
 const TTL_AI = 90 * 24 * 60 * 60 * 1000;
 
-async function fetchStockInfo(query) {
+async function fetchStockInfo(query, cacheRef) {
   console.log("[search] fetchStockInfo called with:", query);
+  const key        = query.trim().toLowerCase();
   const searchTerm = query.trim();
 
-  // STEP 1: Cerca direttamente in Supabase dal frontend
+  // STEP 1: Cerca in memoria React (istantaneo)
+  if (cacheRef?.current?.[key]) {
+    console.log("[search] MEMORY HIT for:", key);
+    const h = cacheRef.current[key];
+    return {
+      symbol:       h.symbol,
+      yahoo_symbol: h.yahoo_symbol,
+      name:         h.name,
+      type:         h.type,
+      category:     h.category,
+      currentPrice: h.currentPrice ?? h.current_price,
+      currency:     h.currency,
+      description:  h.description,
+      risk:         h.risk,
+      sector:       h.sector,
+      explanation:  h.explanation,
+      returns:      h.returns ?? { pessimistic: h.rate, base: h.rate, optimistic: h.rate },
+    };
+  }
+
+  // STEP 2: Cerca in Supabase (~100ms)
   try {
     const { data } = await supabase
       .from("stocks")
       .select("*")
       .or(`symbol.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`)
+      .not("ai_updated_at", "is", null)
       .order("ai_updated_at", { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle();
@@ -103,10 +125,9 @@ async function fetchStockInfo(query) {
 
     if (data?.ai_updated_at && data?.name && data?.description) {
       const aiAge = Date.now() - new Date(data.ai_updated_at).getTime();
-
       if (aiAge < TTL_AI) {
-        console.log("[search] FRONTEND CACHE HIT — skipping backend entirely");
-        return {
+        console.log("[search] SUPABASE HIT for:", data.symbol);
+        const result = {
           symbol:       data.symbol,
           yahoo_symbol: data.yahoo_symbol,
           name:         data.name,
@@ -124,21 +145,27 @@ async function fetchStockInfo(query) {
             optimistic:  data.return_optimistic,
           },
         };
+        if (cacheRef) cacheRef.current[key] = result;
+        return result;
       }
     }
   } catch (e) {
-    console.log("[search] Supabase direct error:", e.message);
+    console.log("[search] Supabase error:", e.message);
   }
 
-  // STEP 2: Cache miss o dati scaduti — chiama il backend
-  console.log("[search] CACHE MISS — calling /api/search");
+  // STEP 3: Cache miss — chiama backend
+  console.log("[search] BACKEND CALL for:", query);
   const res = await fetch("/api/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
-  return res.json();
+  const result = await res.json();
+  if (cacheRef && result.symbol && result.symbol !== "NOT_FOUND") {
+    cacheRef.current[key] = result;
+  }
+  return result;
 }
 
 
@@ -277,7 +304,7 @@ function ExplanationSection({ explanation }) {
 }
 
 // ─── SEARCH PANEL ─────────────────────────────────────────────────────────────
-function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverride }) {
+function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverride, cacheRef }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -291,7 +318,7 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
     if (!query.trim()) return;
     setLoading(true); setResult(null); setError(null);
     try {
-      const data = await fetchStockInfo(query);
+      const data = await fetchStockInfo(query, cacheRef);
       if (data.symbol === "NOT_FOUND" || !data.returns?.base) {
         setError("Asset not found. Try a different name — e.g. Apple, S&P 500, Gold.");
       } else {
@@ -1750,8 +1777,21 @@ export default function App() {
   };
 
   // ── Supabase sync ──────────────────────────────────────────────────────────
-  const saveTimerRef = useRef(null);
-  const canSaveRef = useRef(false);
+  const saveTimerRef   = useRef(null);
+  const canSaveRef     = useRef(false);
+  const stockCacheRef  = useRef({});
+
+  const populateStockCache = (holdings) => {
+    holdings.forEach((h) => {
+      if (!h.symbol) return;
+      stockCacheRef.current[h.symbol.toLowerCase()] = h;
+      if (h.name) {
+        h.name.toLowerCase().split(/\s+/).forEach((word) => {
+          if (word.length > 3) stockCacheRef.current[word] = h;
+        });
+      }
+    });
+  };
 
   const loadPortfolios = async (uid) => {
     canSaveRef.current = false;
@@ -1764,13 +1804,16 @@ export default function App() {
     console.log("[investsim] loadPortfolios ← data:", data, "error:", error);
     if (data?.length) {
       _id = data.length + 1;
-      setPortfolios(data.map((row, i) => ({
+      const portfolioRows = data.map((row, i) => ({
         id: i + 1,
         supabase_id: row.id,
         name: row.name,
         holdings: row.holdings ?? [],
-      })));
+      }));
+      setPortfolios(portfolioRows);
       setSelectedPf(1);
+      // Pre-populate stock cache from all loaded holdings
+      portfolioRows.forEach((pf) => populateStockCache(pf.holdings));
     }
     setTimeout(() => {
       canSaveRef.current = true;
@@ -1830,6 +1873,8 @@ export default function App() {
           : p
       )
     );
+    // Save to in-memory cache so re-searching this stock is instant
+    populateStockCache([stock]);
     setSelectedPf(targetId);
     setSidebarOpen(false);
     if (isFirstHolding && !user && !localStorage.getItem("investsim_gate_shown")) {
@@ -2079,6 +2124,7 @@ export default function App() {
               resetOverride={resetOverride}
               onAdd={(stock) => setAddModal({ open: true, stock })}
               onExplore={(s) => setExploreStock(s)}
+              cacheRef={stockCacheRef}
             />
             {exploreStock && (
               <div style={{ marginTop: 18 }}>
