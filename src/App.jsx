@@ -83,7 +83,52 @@ const getReturns = (symbol, aiReturns, overridesMap) => ({
 });
 
 // ─── AI FETCH ─────────────────────────────────────────────────────────────────
+const TTL_AI    = 90 * 24 * 60 * 60 * 1000;
+const TTL_PRICE = 15 * 60 * 1000;
+
 async function fetchStockInfo(query) {
+  const q   = query.trim();
+  const now = Date.now();
+
+  // 1. Check Supabase directly — zero backend roundtrip if cache is warm
+  try {
+    const { data } = await supabase
+      .from("stocks")
+      .select("*")
+      .or(`symbol.eq.${q.toUpperCase()},name.ilike.%${q}%`)
+      .not("name", "is", null)
+      .maybeSingle();
+
+    if (data) {
+      const aiAge    = data.ai_updated_at    ? now - new Date(data.ai_updated_at).getTime()    : Infinity;
+      const priceAge = data.price_updated_at ? now - new Date(data.price_updated_at).getTime() : Infinity;
+
+      if (aiAge < TTL_AI && priceAge < TTL_PRICE) {
+        return {
+          symbol:       data.symbol,
+          yahoo_symbol: data.yahoo_symbol ?? data.symbol,
+          name:         data.name,
+          type:         data.type,
+          category:     data.category,
+          currentPrice: data.current_price,
+          currency:     data.currency,
+          description:  data.description,
+          risk:         data.risk,
+          sector:       data.sector,
+          explanation:  data.explanation,
+          returns: {
+            pessimistic: data.return_pessimistic,
+            base:        data.return_base,
+            optimistic:  data.return_optimistic,
+          },
+        };
+      }
+    }
+  } catch {
+    // Supabase unreachable — fall through to backend
+  }
+
+  // 2. Cache miss or stale → call /api/search which refreshes what's needed
   const res = await fetch("/api/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
