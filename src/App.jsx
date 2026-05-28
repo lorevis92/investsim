@@ -530,7 +530,9 @@ const SCENARIO_META = [
 ];
 
 // ─── PRICE HISTORY CHART ──────────────────────────────────────────────────────
-function PriceHistoryChart({ symbol, currency }) {
+const CAGR_PERIODS = [5, 10, 15, 20, 25, 30];
+
+function PriceHistoryChart({ symbol, currency, monthly }) {
   const [histData, setHistData] = useState(null);
   const [error, setError] = useState(false);
 
@@ -552,10 +554,7 @@ function PriceHistoryChart({ symbol, currency }) {
 
   if (error) {
     return (
-      <div style={{
-        height: 40, display: "flex", alignItems: "center", paddingLeft: 2,
-        marginBottom: 22,
-      }}>
+      <div style={{ height: 40, display: "flex", alignItems: "center", paddingLeft: 2, marginBottom: 22 }}>
         <span style={{ fontSize: 11, color: T.textMuted, fontFamily: "'Syne', sans-serif", letterSpacing: "0.06em" }}>
           Historical data not available
         </span>
@@ -577,18 +576,34 @@ function PriceHistoryChart({ symbol, currency }) {
     );
   }
 
-  const prices = histData.map((d) => d.price);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const cur = currency || "";
+  const prices      = histData.map((d) => d.price);
+  const minPrice    = Math.min(...prices);
+  const maxPrice    = Math.max(...prices);
+  const cur         = currency || "";
+  const lastPoint   = histData[histData.length - 1];
+  const lastPrice   = lastPoint.price;
+  const lastYear    = parseInt(lastPoint.date.slice(0, 4));
+  const lastMoPad   = lastPoint.date.slice(5, 7);
 
   const fmtHistPrice = (v) =>
     v >= 1000
       ? v.toLocaleString("en-CH", { maximumFractionDigits: 0 })
       : v.toLocaleString("en-CH", { maximumFractionDigits: 2 });
 
+  // CAGR per period: find price N years back, annualise growth
+  const cagrPeriods = CAGR_PERIODS.map((years) => {
+    const targetDate = `${lastYear - years}-${lastMoPad}`;
+    const entry = histData.find((d) => d.date >= targetDate);
+    if (!entry) return { years, cagr: null };
+    const cagrVal = (Math.pow(lastPrice / entry.price, 1 / years) - 1) * 100;
+    return { years, cagr: parseFloat(cagrVal.toFixed(1)) };
+  });
+
+  const hasAnyCagr = cagrPeriods.some((d) => d.cagr !== null);
+
   return (
     <div style={{ marginBottom: 22 }}>
+      {/* Chart */}
       <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif", marginBottom: 10 }}>
         Price history — last 30 years
       </div>
@@ -636,6 +651,52 @@ function PriceHistoryChart({ symbol, currency }) {
           High: <span style={{ color: T.green, fontWeight: 700 }}>{cur} {fmtHistPrice(maxPrice)}</span>
         </span>
       </div>
+
+      {/* Historical CAGR performance grid */}
+      {hasAnyCagr && (
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 10, color: T.textMuted, letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 700, fontFamily: "'Syne', sans-serif", marginBottom: 10 }}>
+            Historical performance — annualized returns
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+            {cagrPeriods.map(({ years, cagr }) => {
+              const label = `${years}Y`;
+              if (cagr === null) {
+                return (
+                  <div key={years} style={{
+                    background: T.surface, border: `1px solid ${T.border}`,
+                    borderRadius: 4, padding: "10px 8px", textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: 10, color: T.textMuted, fontWeight: 700, fontFamily: "'Syne', sans-serif", letterSpacing: "0.08em", marginBottom: 6 }}>{label}</div>
+                    <div style={{ fontSize: 12, color: T.textMuted, ...NUM }}>N/A</div>
+                  </div>
+                );
+              }
+              const color = cagr >= 0 ? T.green : T.primary;
+              const fv = calcDCA(monthly, cagr / 100, years);
+              return (
+                <div key={years} style={{
+                  background: T.surface, border: `1px solid ${T.border}`,
+                  borderRadius: 4, padding: "10px 8px", textAlign: "center",
+                }}>
+                  <div style={{ fontSize: 10, color: T.textMuted, fontWeight: 700, fontFamily: "'Syne', sans-serif", letterSpacing: "0.08em", marginBottom: 6 }}>{label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color, ...NUM }}>
+                    {cagr >= 0 ? "+" : ""}{cagr}%
+                  </div>
+                  <div style={{ fontSize: 9, color, marginTop: 1, fontFamily: "'Syne', sans-serif", letterSpacing: "0.04em" }}>/ year</div>
+                  <div style={{ fontSize: 10, color: T.textMuted, marginTop: 7, fontFamily: "'Syne', sans-serif", lineHeight: 1.5 }}>
+                    CHF {monthly}/mo
+                    <br />→ <span style={{ color: T.text, fontWeight: 700, ...NUM }}>{fmtK(fv)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 10, color: T.textMuted, marginTop: 8, marginBottom: 0, lineHeight: 1.6, fontFamily: "'Syne', sans-serif" }}>
+            Based on real price data. Past performance does not guarantee future results.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -882,7 +943,7 @@ function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverrid
       </div>
 
       {/* Price history chart */}
-      <PriceHistoryChart symbol={stock.symbol} currency={currency} />
+      <PriceHistoryChart symbol={stock.symbol} currency={currency} monthly={monthly} />
 
       {/* Monthly slider */}
       <div style={{ marginBottom: 22 }}>
