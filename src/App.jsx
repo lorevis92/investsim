@@ -93,22 +93,6 @@ async function fetchStockInfo(query) {
   return res.json();
 }
 
-// ─── OVERRIDE PERSISTENCE ─────────────────────────────────────────────────────
-async function loadOverrides(symbol) {
-  try {
-    const saved = localStorage.getItem(`wisi_override_${symbol}`);
-    if (saved) return JSON.parse(saved);
-  } catch {}
-  return null;
-}
-
-function saveOverrides(symbol, overrides) {
-  if (overrides) {
-    localStorage.setItem(`wisi_override_${symbol}`, JSON.stringify(overrides));
-  } else {
-    localStorage.removeItem(`wisi_override_${symbol}`);
-  }
-}
 
 // ─── SMALL COMPONENTS ─────────────────────────────────────────────────────────
 function Badge({ children }) {
@@ -1594,7 +1578,7 @@ export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState("signup");
   const [addModal, setAddModal] = useState({ open: false, stock: null });
-  const [activePage, setActivePage] = useState("search");
+  const [activePage, setActivePage] = useState(() => localStorage.getItem("wisi_activePage") || "search");
   const [searchKey, setSearchKey] = useState(0);
   const [overridesMap, setOverridesMap] = useState({});
   const [detailStock, setDetailStock] = useState(null);
@@ -1629,6 +1613,7 @@ export default function App() {
 
   useEffect(() => {
     if (activePage !== "portfolio") setDetailStock(null);
+    localStorage.setItem("wisi_activePage", activePage);
   }, [activePage]);
 
   useEffect(() => {
@@ -1636,36 +1621,78 @@ export default function App() {
     document.documentElement.style.overflowX = "hidden";
   }, []);
 
-  const loadAllOverrides = () => {
-    const map = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k?.startsWith("wisi_override_")) {
-        try {
-          const sym = k.replace("wisi_override_", "");
-          const val = JSON.parse(localStorage.getItem(k));
-          if (val) map[sym] = val;
-        } catch {}
+  const loadAllOverrides = async (u) => {
+    if (u) {
+      try {
+        const { data, error } = await supabase
+          .from("user_overrides")
+          .select("symbol, pessimistic, base, optimistic")
+          .eq("user_id", u.id);
+        if (error) throw error;
+        const map = {};
+        (data ?? []).forEach(({ symbol, pessimistic, base, optimistic }) => {
+          const entry = {};
+          if (pessimistic != null) entry.pessimistic = pessimistic;
+          if (base != null) entry.base = base;
+          if (optimistic != null) entry.optimistic = optimistic;
+          if (Object.keys(entry).length) map[symbol] = entry;
+        });
+        setOverridesMap(map);
+      } catch (e) {
+        console.error("[overrides] loadAllOverrides error:", e);
       }
+    } else {
+      const map = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith("wisi_override_")) {
+          try {
+            const sym = k.replace("wisi_override_", "");
+            const val = JSON.parse(localStorage.getItem(k));
+            if (val) map[sym] = val;
+          } catch {}
+        }
+      }
+      setOverridesMap(map);
     }
-    setOverridesMap(map);
   };
 
   const saveOverride = (symbol, key, value) => {
     setOverridesMap((prev) => {
       const cur = prev[symbol] ?? {};
       const updated = { ...prev, [symbol]: { ...cur, [key]: value } };
-      saveOverrides(symbol, updated[symbol]);
+      if (!user) {
+        localStorage.setItem(`wisi_override_${symbol}`, JSON.stringify(updated[symbol]));
+      }
       return updated;
     });
+    if (user) {
+      supabase.from("user_overrides").upsert({
+        user_id: user.id,
+        symbol,
+        [key]: value,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id,symbol" }).then(({ error }) => {
+        if (error) console.error("[overrides] upsert error:", error);
+      });
+    }
   };
 
   const resetOverride = (symbol) => {
     setOverridesMap((prev) => {
       const { [symbol]: _, ...rest } = prev;
-      saveOverrides(symbol, null);
       return rest;
     });
+    if (user) {
+      supabase.from("user_overrides").delete()
+        .eq("user_id", user.id)
+        .eq("symbol", symbol)
+        .then(({ error }) => {
+          if (error) console.error("[overrides] delete error:", error);
+        });
+    } else {
+      localStorage.removeItem(`wisi_override_${symbol}`);
+    }
   };
 
   const goHome = () => {
@@ -1707,14 +1734,13 @@ export default function App() {
     console.log("[investsim] user effect → user:", user?.email ?? null);
     if (user) {
       loadPortfolios(user.id);
-      loadAllOverrides();
+      loadAllOverrides(user);
     } else {
       canSaveRef.current = false;
       _id = 1;
       setPortfolios([makePortfolio()]);
       setSelectedPf(1);
-      setOverridesMap({});
-      loadAllOverrides();
+      loadAllOverrides(null);
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
