@@ -94,45 +94,19 @@ async function fetchStockInfo(query) {
 }
 
 // ─── OVERRIDE PERSISTENCE ─────────────────────────────────────────────────────
-async function loadOverrides(symbol, user) {
-  if (user) {
-    try {
-      const { data } = await supabase
-        .from("stocks")
-        .select("user_overrides")
-        .eq("symbol", symbol)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data?.user_overrides) {
-        const { userId: _uid, ...rates } = data.user_overrides;
-        return rates;
-      }
-    } catch {}
-  } else {
-    try {
-      const saved = localStorage.getItem(`wisi_override_${symbol}`);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-  }
+async function loadOverrides(symbol) {
+  try {
+    const saved = localStorage.getItem(`wisi_override_${symbol}`);
+    if (saved) return JSON.parse(saved);
+  } catch {}
   return null;
 }
 
-async function saveOverrides(symbol, overrides, user) {
-  if (user) {
-    try {
-      await supabase.from("stocks").upsert({
-        symbol,
-        user_id: user.id,
-        user_overrides: overrides ? { ...overrides, userId: user.id } : null,
-        updated_at: new Date().toISOString(),
-      });
-    } catch {}
+function saveOverrides(symbol, overrides) {
+  if (overrides) {
+    localStorage.setItem(`wisi_override_${symbol}`, JSON.stringify(overrides));
   } else {
-    if (overrides) {
-      localStorage.setItem(`wisi_override_${symbol}`, JSON.stringify(overrides));
-    } else {
-      localStorage.removeItem(`wisi_override_${symbol}`);
-    }
+    localStorage.removeItem(`wisi_override_${symbol}`);
   }
 }
 
@@ -1640,27 +1614,6 @@ export default function App() {
     };
     setDetailStock(stock);
     window.history.pushState({ portfolioDetail: holding.symbol }, "");
-    if (user) {
-      try {
-        const { data } = await supabase
-          .from("stocks")
-          .select("*")
-          .eq("symbol", holding.symbol)
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (data) {
-          setDetailStock((prev) => prev ? {
-            ...prev,
-            currentPrice: data.current_price ?? prev.currentPrice,
-            currency: data.currency ?? prev.currency,
-            description: data.description ?? prev.description,
-            risk: data.risk ?? prev.risk,
-            type: data.type ?? prev.type,
-            explanation: data.explanation ?? prev.explanation,
-          } : prev);
-        }
-      } catch {}
-    }
   };
 
   const closeDetail = () => {
@@ -1683,44 +1636,26 @@ export default function App() {
     document.documentElement.style.overflowX = "hidden";
   }, []);
 
-  const loadAllOverrides = async (u) => {
-    if (u) {
-      try {
-        const { data } = await supabase
-          .from("stocks")
-          .select("symbol, user_overrides")
-          .eq("user_id", u.id)
-          .not("user_overrides", "is", null);
-        if (data?.length) {
-          const map = {};
-          data.forEach(({ symbol, user_overrides }) => {
-            const { userId: _uid, ...rates } = user_overrides;
-            if (Object.keys(rates).length) map[symbol] = rates;
-          });
-          setOverridesMap(map);
-        }
-      } catch {}
-    } else {
-      const map = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k?.startsWith("wisi_override_")) {
-          try {
-            const sym = k.replace("wisi_override_", "");
-            const val = JSON.parse(localStorage.getItem(k));
-            if (val) map[sym] = val;
-          } catch {}
-        }
+  const loadAllOverrides = () => {
+    const map = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith("wisi_override_")) {
+        try {
+          const sym = k.replace("wisi_override_", "");
+          const val = JSON.parse(localStorage.getItem(k));
+          if (val) map[sym] = val;
+        } catch {}
       }
-      setOverridesMap(map);
     }
+    setOverridesMap(map);
   };
 
   const saveOverride = (symbol, key, value) => {
     setOverridesMap((prev) => {
       const cur = prev[symbol] ?? {};
       const updated = { ...prev, [symbol]: { ...cur, [key]: value } };
-      saveOverrides(symbol, updated[symbol], user);
+      saveOverrides(symbol, updated[symbol]);
       return updated;
     });
   };
@@ -1728,7 +1663,7 @@ export default function App() {
   const resetOverride = (symbol) => {
     setOverridesMap((prev) => {
       const { [symbol]: _, ...rest } = prev;
-      saveOverrides(symbol, null, user);
+      saveOverrides(symbol, null);
       return rest;
     });
   };
@@ -1772,14 +1707,14 @@ export default function App() {
     console.log("[investsim] user effect → user:", user?.email ?? null);
     if (user) {
       loadPortfolios(user.id);
-      loadAllOverrides(user);
+      loadAllOverrides();
     } else {
       canSaveRef.current = false;
       _id = 1;
       setPortfolios([makePortfolio()]);
       setSelectedPf(1);
       setOverridesMap({});
-      loadAllOverrides(null);
+      loadAllOverrides();
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
