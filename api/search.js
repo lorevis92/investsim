@@ -100,21 +100,37 @@ export default async function handler(request) {
 
   const supabase = getSupabase();
   const cutoff = new Date(Date.now() - CACHE_TTL_MS).toISOString();
+  const q = query.trim();
 
-  // Cache lookup: match by symbol (uppercase) and freshness
-  const { data: cached } = await supabase
+  // 1. Exact symbol match (e.g. user types "AAPL")
+  let { data: cached } = await supabase
     .from('stocks')
     .select('*')
-    .eq('symbol', query.trim().toUpperCase())
+    .eq('symbol', q.toUpperCase())
+    .not('name', 'is', null)
     .gt('updated_at', cutoff)
     .maybeSingle();
 
+  // 2. Name ILIKE fallback (e.g. user types "Apple" → matches "Apple Inc.")
+  if (!cached) {
+    const { data: rows } = await supabase
+      .from('stocks')
+      .select('*')
+      .ilike('name', `%${q}%`)
+      .not('name', 'is', null)
+      .gt('updated_at', cutoff)
+      .limit(1);
+    cached = rows?.[0] ?? null;
+  }
+
   if (cached) {
+    console.log(`CACHE HIT: ${cached.symbol} — "${cached.name}" (query: "${q}")`);
     return new Response(JSON.stringify(mapToApiShape(cached)), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
+  console.log(`CACHE MISS for query: "${q}"`);
   // Cache miss — call Claude API
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
