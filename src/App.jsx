@@ -644,38 +644,44 @@ function PriceHistoryChart({ symbol, currency }) {
 function DCAExplanation({ monthly, annualRate }) {
   const [open, setOpen] = useState(false);
 
-  const mr = annualRate / 1200;
-  const mrPct = (annualRate / 12).toFixed(3);
-  const fmt2 = (v) => v.toLocaleString("en-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const r    = annualRate / 1200;
+  const rPct = (annualRate / 12).toFixed(3) + "%";
+  const n30  = 360;
 
-  // Month-by-month for the first 3 months
-  const m1End     = monthly * (1 + mr);
-  const m1Int     = monthly * mr;
-  const m2Total   = m1End + monthly;
-  const m2Int     = m2Total * mr;
-  const m2End     = m2Total * (1 + mr);
-  const m3Total   = m2End + monthly;
-  const m3Int     = m3Total * mr;
-  const m3End     = m3Total * (1 + mr);
+  // First 3 months step-by-step
+  const m1Interest = monthly * r;
+  const m1End      = monthly * (1 + r);
+  const m2Start    = m1End + monthly;
+  const m2Interest = m2Start * r;
+  const m2End      = m2Start * (1 + r);
+  const m3Start    = m2End + monthly;
+  const m3Interest = m3Start * r;
+  const m3End      = m3Start * (1 + r);
 
-  // Table
-  const TABLE_YEARS = [5, 10, 20, 30];
-
-  // Crossover: first year where portfolio monthly return >= monthly contribution
+  // Crossover year
   let crossoverYear = null;
-  for (let y = 1; y <= 100; y++) {
-    if (calcDCA(monthly, annualRate / 100, y) * mr >= monthly) {
+  for (let y = 1; y <= 50; y++) {
+    if (calcDCA(monthly, annualRate / 100, y) * r > monthly) {
       crossoverYear = y;
       break;
     }
   }
 
-  const thStyle = (right) => ({
+  const fmt2 = (v) => v.toLocaleString("en-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const TABLE_YEARS = [5, 10, 20, 30];
+
+  const SHEAD = {
+    fontSize: 10, fontWeight: 700, color: T.textSecondary,
+    letterSpacing: "0.10em", textTransform: "uppercase",
+    fontFamily: "'Syne', sans-serif", marginBottom: 14,
+  };
+  const thL = {
     padding: "9px 14px", fontSize: 10, fontWeight: 700,
     color: T.textSecondary, letterSpacing: "0.09em",
     textTransform: "uppercase", fontFamily: "'Syne', sans-serif",
-    textAlign: right ? "right" : "left",
-  });
+    textAlign: "left",
+  };
+  const thR = { ...thL, textAlign: "right" };
 
   return (
     <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 20 }}>
@@ -696,91 +702,135 @@ function DCAExplanation({ monthly, annualRate }) {
       </button>
 
       {open && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingBottom: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 24 }}>
 
-          {/* Part 1 — first 3 months */}
-          <div style={{ background: T.surface, borderRadius: 4, padding: "14px 16px", border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: T.textSecondary, marginBottom: 12, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-              Step by step — first 3 months
+          {/* ── SECTION 1: The formula ── */}
+          <div style={{ background: T.surface, borderRadius: 4, padding: "18px 20px", border: `1px solid ${T.border}` }}>
+            <div style={SHEAD}>The Formula</div>
+
+            <div style={{
+              textAlign: "center", fontFamily: "'DM Mono', monospace",
+              fontSize: 17, fontWeight: 500, color: T.text,
+              padding: "18px 12px", letterSpacing: "0.04em",
+              background: T.bg, border: `1px solid ${T.border}`,
+              borderRadius: 4, marginBottom: 16,
+            }}>
+              FV = PMT × [(1 + r)ⁿ − 1] / r × (1 + r)
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+
+            <div style={{ overflowX: "auto", borderRadius: 4, border: `1px solid ${T.border}`, marginBottom: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: T.surfaceAlt, borderBottom: `1px solid ${T.border}` }}>
+                    <th style={thL}>Symbol</th>
+                    <th style={thL}>Name</th>
+                    <th style={thL}>In your case</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { sym: "FV",     name: "Future Value",     desc: "The total value of your portfolio at the end" },
+                    { sym: "PMT",    name: "Monthly payment",  desc: `The amount you invest every month — in your case CHF ${fmt2(monthly)}` },
+                    { sym: "r",      name: "Monthly rate",     desc: `Your annual return divided by 12 — ${annualRate}% ÷ 12 = ${rPct} per month` },
+                    { sym: "n",      name: "Number of months", desc: `Total months of investment — e.g. 30 years = ${n30} months` },
+                    { sym: "(1+r)ⁿ", name: "Compound factor", desc: "How much CHF 1 invested today grows after n months — this is the core of compounding" },
+                  ].map(({ sym, name, desc }, i) => (
+                    <tr key={sym} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 ? T.surface : T.bg }}>
+                      <td style={{ padding: "9px 14px", fontWeight: 700, color: T.primary, fontFamily: "'DM Mono', monospace", fontSize: 13, whiteSpace: "nowrap" }}>{sym}</td>
+                      <td style={{ padding: "9px 14px", color: T.textSecondary, fontWeight: 600, fontFamily: "'Syne', sans-serif", fontSize: 12, whiteSpace: "nowrap" }}>{name}</td>
+                      <td style={{ padding: "9px 14px", color: T.text, fontFamily: "'Syne', sans-serif", fontSize: 12, lineHeight: 1.55 }}>{desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p style={{ fontSize: 12, color: T.textSecondary, lineHeight: 1.75, margin: 0, fontFamily: "'Syne', sans-serif" }}>
+              This formula calculates the future value of a series of equal monthly payments, each growing at a compound rate. The × (1+r) at the end adjusts for payments made at the beginning of each month rather than the end.
+            </p>
+          </div>
+
+          {/* ── SECTION 2: Step by step ── */}
+          <div style={{ background: T.surface, borderRadius: 4, padding: "18px 20px", border: `1px solid ${T.border}` }}>
+            <div style={SHEAD}>Step by step — your first 3 months</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[
-                {
-                  label: "Month 1",
-                  line1: <>You invest <strong style={{ ...NUM, color: T.primary }}>CHF {fmt2(monthly)}</strong>.</>,
-                  line2: <>It earns <span style={NUM}>{mrPct}%</span> = <strong style={NUM}>CHF {fmt2(m1Int)}</strong>.</>,
-                  end: m1End,
-                },
-                {
-                  label: "Month 2",
-                  line1: <>You invest another <strong style={{ ...NUM, color: T.primary }}>CHF {fmt2(monthly)}</strong>.</>,
-                  line2: <>Total <strong style={NUM}>CHF {fmt2(m2Total)}</strong> grows by {mrPct}% = <strong style={NUM}>CHF {fmt2(m2Int)}</strong>.</>,
-                  end: m2End,
-                },
-                {
-                  label: "Month 3",
-                  line1: <>You invest another <strong style={{ ...NUM, color: T.primary }}>CHF {fmt2(monthly)}</strong>.</>,
-                  line2: <>Total <strong style={NUM}>CHF {fmt2(m3Total)}</strong> grows by {mrPct}% = <strong style={NUM}>CHF {fmt2(m3Int)}</strong>.</>,
-                  end: m3End,
-                },
-              ].map(({ label, line1, line2, end }) => (
-                <div key={label} style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.7, fontFamily: "'Syne', sans-serif" }}>
-                  <span style={{ fontWeight: 700, color: T.text }}>{label}:</span>{" "}{line1}{" "}{line2}{" "}
+                { n: 1, start: null, interest: m1Interest, end: m1End },
+                { n: 2, start: m2Start, interest: m2Interest, end: m2End },
+                { n: 3, start: m3Start, interest: m3Interest, end: m3End },
+              ].map(({ n, start, interest, end }) => (
+                <div key={n} style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.75, fontFamily: "'Syne', sans-serif" }}>
+                  <span style={{ fontWeight: 700, color: T.text }}>Month {n}:</span>{" "}
+                  {n === 1
+                    ? <>You invest <strong style={{ ...NUM, color: T.primary }}>CHF {fmt2(monthly)}</strong>. It earns <span style={NUM}>{rPct}</span> this month = <strong style={{ ...NUM, color: T.green }}>+CHF {fmt2(interest)}</strong>.</>
+                    : <>You invest another <strong style={{ ...NUM, color: T.primary }}>CHF {fmt2(monthly)}</strong>. Your total <strong style={NUM}>CHF {fmt2(start)}</strong> earns <span style={NUM}>{rPct}</span> = <strong style={{ ...NUM, color: T.green }}>+CHF {fmt2(interest)}</strong>.</>
+                  }{" "}
                   End of month: <strong style={{ ...NUM, color: T.text }}>CHF {fmt2(end)}</strong>.
                 </div>
               ))}
               <div style={{ fontSize: 12, color: T.textMuted, fontStyle: "italic", fontFamily: "'Syne', sans-serif" }}>
-                … and so on for {30 * 12} months.
+                … and so on for 30 years ({n30} months).
               </div>
             </div>
           </div>
 
-          {/* Part 2 — milestone table */}
-          <div style={{ overflowX: "auto", borderRadius: 4, border: `1px solid ${T.border}` }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                  <th style={thStyle(false)}>Year</th>
-                  <th style={thStyle(true)}>Invested</th>
-                  <th style={thStyle(true)}>Value</th>
-                  <th style={thStyle(true)}>Net gain</th>
-                  <th style={thStyle(true)}>Multiplier</th>
-                </tr>
-              </thead>
-              <tbody>
-                {TABLE_YEARS.map((y, i) => {
-                  const invested = monthly * 12 * y;
-                  const value    = calcDCA(monthly, annualRate / 100, y);
-                  const gain     = value - invested;
-                  return (
-                    <tr key={y} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 ? T.surface : T.bg }}>
-                      <td style={{ padding: "9px 14px", fontWeight: 700, color: T.textSecondary, fontFamily: "'Syne', sans-serif", fontSize: 12 }}>Year {y}</td>
-                      <td style={{ padding: "9px 14px", textAlign: "right", color: T.textSecondary, ...NUM }}>{fmtCHF(invested)}</td>
-                      <td style={{ padding: "9px 14px", textAlign: "right", fontWeight: 700, color: T.text, ...NUM }}>{fmtCHF(value)}</td>
-                      <td style={{ padding: "9px 14px", textAlign: "right", fontWeight: 700, color: T.green, ...NUM }}>+{fmtCHF(gain)}</td>
-                      <td style={{ padding: "9px 14px", textAlign: "right", color: T.text, ...NUM }}>{(value / invested).toFixed(1)}×</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* ── SECTION 3: Milestone table ── */}
+          <div>
+            <div style={{ ...SHEAD, marginBottom: 10 }}>
+              Your projection — base scenario ({annualRate}% / year)
+            </div>
+            <div style={{ overflowX: "auto", borderRadius: 4, border: `1px solid ${T.border}` }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                    <th style={thL}>Year</th>
+                    <th style={thR}>Invested</th>
+                    <th style={thR}>Portfolio value</th>
+                    <th style={thR}>Net gain</th>
+                    <th style={thR}>Multiplier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {TABLE_YEARS.map((y, i) => {
+                    const invested = monthly * 12 * y;
+                    const value    = calcDCA(monthly, annualRate / 100, y);
+                    const gain     = value - invested;
+                    return (
+                      <tr key={y} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 ? T.surface : T.bg }}>
+                        <td style={{ padding: "9px 14px", fontWeight: 700, color: T.textSecondary, fontFamily: "'Syne', sans-serif", fontSize: 12 }}>Year {y}</td>
+                        <td style={{ padding: "9px 14px", textAlign: "right", color: T.textSecondary, ...NUM }}>{fmtCHF(invested)}</td>
+                        <td style={{ padding: "9px 14px", textAlign: "right", fontWeight: 700, color: T.text, ...NUM }}>{fmtCHF(value)}</td>
+                        <td style={{ padding: "9px 14px", textAlign: "right", fontWeight: 700, color: T.green, ...NUM }}>+{fmtCHF(gain)}</td>
+                        <td style={{ padding: "9px 14px", textAlign: "right", color: T.text, ...NUM }}>{(value / invested).toFixed(1)}×</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Part 3 — crossover */}
-          {crossoverYear && (
-            <div style={{
-              background: T.greenLight, border: `1px solid ${T.greenBorder}`,
-              borderRadius: 4, padding: "14px 16px",
-            }}>
-              <span style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.7, fontFamily: "'Syne', sans-serif" }}>
+          {/* ── SECTION 4: Crossover ── */}
+          <div style={{
+            background: crossoverYear ? T.greenLight : T.surface,
+            border: `1px solid ${crossoverYear ? T.greenBorder : T.border}`,
+            borderRadius: 4, padding: "16px 18px",
+          }}>
+            <div style={{ ...SHEAD, marginBottom: 8 }}>The crossover point</div>
+            {crossoverYear ? (
+              <span style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.75, fontFamily: "'Syne', sans-serif" }}>
                 After{" "}
                 <strong style={{ ...NUM, color: T.green }}>{crossoverYear} {crossoverYear === 1 ? "year" : "years"}</strong>
-                , your money works harder than you — monthly returns exceed your{" "}
-                <strong style={{ ...NUM, color: T.text }}>CHF {fmt2(monthly)}</strong>{" "}
-                contribution.
+                , your portfolio generates more than{" "}
+                <strong style={{ ...NUM, color: T.text }}>CHF {fmt2(monthly)}/month</strong>{" "}
+                in returns — your money works harder than you.
               </span>
-            </div>
-          )}
+            ) : (
+              <span style={{ fontSize: 13, color: T.textMuted, fontFamily: "'Syne', sans-serif" }}>
+                With this return rate, the crossover point is beyond 50 years.
+              </span>
+            )}
+          </div>
 
         </div>
       )}
