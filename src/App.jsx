@@ -87,23 +87,43 @@ const TTL_AI    = 90 * 24 * 60 * 60 * 1000;
 const TTL_PRICE = 15 * 60 * 1000;
 
 async function fetchStockInfo(query) {
+  console.log("[search] fetchStockInfo called with:", query);
+
   const q   = query.trim();
   const now = Date.now();
 
   // 1. Check Supabase directly — zero backend roundtrip if cache is warm
   try {
-    const { data } = await supabase
+    console.log("[search] checking Supabase cache for:", q.toUpperCase());
+
+    const { data, error } = await supabase
       .from("stocks")
       .select("*")
       .or(`symbol.eq.${q.toUpperCase()},name.ilike.%${q}%`)
       .not("name", "is", null)
       .maybeSingle();
 
+    console.log("[search] Supabase result:", {
+      found:            !!data,
+      symbol:           data?.symbol,
+      ai_updated_at:    data?.ai_updated_at,
+      price_updated_at: data?.price_updated_at,
+      error,
+    });
+
     if (data) {
       const aiAge    = data.ai_updated_at    ? now - new Date(data.ai_updated_at).getTime()    : Infinity;
       const priceAge = data.price_updated_at ? now - new Date(data.price_updated_at).getTime() : Infinity;
 
+      console.log("[search] TTL check:", {
+        aiAgeDays:       Math.round(aiAge / 86400000),
+        priceAgeMinutes: Math.round(priceAge / 60000),
+        aiOk:            aiAge < TTL_AI,
+        priceOk:         priceAge < TTL_PRICE,
+      });
+
       if (aiAge < TTL_AI && priceAge < TTL_PRICE) {
+        console.log("[search] full cache HIT — returning Supabase data for", data.symbol);
         return {
           symbol:       data.symbol,
           yahoo_symbol: data.yahoo_symbol ?? data.symbol,
@@ -123,9 +143,13 @@ async function fetchStockInfo(query) {
           },
         };
       }
+
+      console.log("[search] cache STALE — falling through to /api/search");
+    } else {
+      console.log("[search] not in Supabase — calling /api/search");
     }
-  } catch {
-    // Supabase unreachable — fall through to backend
+  } catch (e) {
+    console.log("[search] Supabase error, falling through to /api/search:", e?.message);
   }
 
   // 2. Cache miss or stale → call /api/search which refreshes what's needed
