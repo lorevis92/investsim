@@ -104,6 +104,8 @@ async function fetchStockInfo(query) {
       .limit(1)
       .maybeSingle();
 
+    console.log("[search] raw data:", JSON.stringify(data));
+    console.log("[search] data keys:", data ? Object.keys(data) : "null");
     console.log("[search] Supabase result:", {
       found:            !!data,
       symbol:           data?.symbol,
