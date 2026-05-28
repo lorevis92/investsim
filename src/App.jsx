@@ -1909,88 +1909,153 @@ export default function App() {
       {/* Header */}
       <header style={{
         background: T.bg, borderBottom: `1px solid ${T.border}`,
-        padding: "12px 20px",
-        display: "flex", alignItems: "center", gap: 14,
+        padding: isMobile ? "8px 12px" : "12px 20px",
         position: "sticky", top: 0, zIndex: 30,
       }}>
-        <button
-          onClick={() => setSidebarOpen(true)}
-          style={{
-            background: "transparent", border: `1px solid ${T.border}`, borderRadius: 3,
-            color: T.textSecondary, cursor: "pointer", padding: "7px 10px", fontSize: 14, lineHeight: 1,
-          }}
-        >☰</button>
-
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
-          {/* Logo + brand — clickable, goes home */}
-          <div
-            onClick={goHome}
-            style={{ display: "flex", alignItems: "center", gap: 2, cursor: "pointer", flexShrink: 0 }}
-          >
-            <img
-              src="/logo-wisi.png"
-              alt="WisiInvest"
-              style={{ height: isMobile ? 34 : 44, width: "auto", objectFit: "contain" }}
-            />
-            <span style={{
-              fontSize: 16, fontWeight: 800, color: T.primary,
-              textTransform: "uppercase", letterSpacing: "0.10em",
-              fontFamily: "'Syne', sans-serif",
-            }}>NVEST</span>
-          </div>
-
-          {/* Nav tabs */}
-          <div style={{
-            display: "flex", gap: 2, background: T.surface,
-            borderRadius: 3, padding: 3, border: `1px solid ${T.border}`, flexShrink: 0,
-          }}>
-            {[["search", "Search"], ["portfolio", "Portfolio"]].map(([page, label]) => (
+        {isMobile ? (
+          <>
+            {/* Mobile row 1: hamburger | logo+brand | auth */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <button
-                key={page}
-                onClick={() => setActivePage(page)}
+                onClick={() => setSidebarOpen(true)}
                 style={{
-                  background: activePage === page ? T.primary : "transparent",
-                  color: activePage === page ? "#fff" : T.textSecondary,
-                  border: "none", borderRadius: 2,
-                  padding: isMobile ? "6px 10px" : "6px 14px",
-                  fontSize: isMobile ? 10 : 11, fontWeight: 700,
-                  cursor: "pointer", fontFamily: "'Syne', sans-serif",
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                  transition: "background .15s, color .15s",
+                  background: "transparent", border: `1px solid ${T.border}`, borderRadius: 3,
+                  color: T.textSecondary, cursor: "pointer", padding: "7px 10px",
+                  fontSize: 14, lineHeight: 1, flexShrink: 0,
                 }}
-              >{label}</button>
-            ))}
-          </div>
-        </div>
+              >☰</button>
 
-        {user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            {!isMobile && (
-              <span style={{ fontSize: 11, color: T.textMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user.email}
-              </span>
-            )}
-            <button
-              onClick={logout}
-              style={{
-                background: "transparent", border: `1px solid ${T.border}`,
-                borderRadius: 3, color: T.textSecondary,
-                fontSize: 11, fontWeight: 700, padding: "6px 12px",
-                cursor: "pointer", fontFamily: "'Syne', sans-serif",
-                letterSpacing: "0.07em", textTransform: "uppercase",
-              }}
-            >Sign out</button>
-          </div>
+              <div
+                onClick={goHome}
+                style={{ display: "flex", alignItems: "center", gap: 2, cursor: "pointer" }}
+              >
+                <img src="/logo-wisi.png" alt="WisiInvestin" style={{ height: 30, width: "auto", objectFit: "contain" }} />
+                <span style={{
+                  fontSize: 13, fontWeight: 800, color: T.primary,
+                  textTransform: "uppercase", letterSpacing: "0.10em",
+                  fontFamily: "'Syne', sans-serif",
+                }}>NVESTIN</span>
+              </div>
+
+              {user ? (
+                <button
+                  onClick={logout}
+                  style={{
+                    background: "transparent", border: `1px solid ${T.border}`,
+                    borderRadius: 3, color: T.textSecondary,
+                    fontSize: 10, fontWeight: 700, padding: "6px 10px",
+                    cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                    letterSpacing: "0.07em", textTransform: "uppercase", flexShrink: 0,
+                  }}
+                >Sign out</button>
+              ) : (
+                <button
+                  onClick={() => { setAuthModalTab("login"); setAuthModalOpen(true); }}
+                  style={{
+                    background: T.primary, border: "none", borderRadius: 3,
+                    color: "#fff", fontSize: 10, fontWeight: 700,
+                    padding: "6px 10px", cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                    flexShrink: 0, letterSpacing: "0.08em", textTransform: "uppercase",
+                  }}
+                >Sign in</button>
+              )}
+            </div>
+
+            {/* Mobile row 2: full-width tabs */}
+            <div style={{ display: "flex", marginTop: 8 }}>
+              {[["search", "Search"], ["portfolio", "Portfolio"]].map(([page, label]) => (
+                <button
+                  key={page}
+                  onClick={() => setActivePage(page)}
+                  style={{
+                    width: "50%", textAlign: "center",
+                    background: activePage === page ? T.primary : T.surface,
+                    color: activePage === page ? "#fff" : T.textSecondary,
+                    border: `1px solid ${T.border}`, borderRadius: 2,
+                    padding: "10px 0", fontSize: 11, fontWeight: 700,
+                    cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                    letterSpacing: "0.08em", textTransform: "uppercase",
+                    transition: "background .15s, color .15s",
+                  }}
+                >{label}</button>
+              ))}
+            </div>
+          </>
         ) : (
-          <button
-            onClick={() => { setAuthModalTab("login"); setAuthModalOpen(true); }}
-            style={{
-              background: T.primary, border: "none", borderRadius: 3,
-              color: "#fff", fontSize: 11, fontWeight: 700,
-              padding: "8px 16px", cursor: "pointer", fontFamily: "'Syne', sans-serif",
-              flexShrink: 0, letterSpacing: "0.08em", textTransform: "uppercase",
-            }}
-          >Sign in</button>
+          /* Desktop: single row */
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                background: "transparent", border: `1px solid ${T.border}`, borderRadius: 3,
+                color: T.textSecondary, cursor: "pointer", padding: "7px 10px",
+                fontSize: 14, lineHeight: 1, flexShrink: 0,
+              }}
+            >☰</button>
+
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
+              <div
+                onClick={goHome}
+                style={{ display: "flex", alignItems: "center", gap: 2, cursor: "pointer", flexShrink: 0 }}
+              >
+                <img src="/logo-wisi.png" alt="WisiInvestin" style={{ height: 44, width: "auto", objectFit: "contain" }} />
+                <span style={{
+                  fontSize: 16, fontWeight: 800, color: T.primary,
+                  textTransform: "uppercase", letterSpacing: "0.10em",
+                  fontFamily: "'Syne', sans-serif",
+                }}>NVESTIN</span>
+              </div>
+
+              <div style={{
+                display: "flex", gap: 2, background: T.surface,
+                borderRadius: 3, padding: 3, border: `1px solid ${T.border}`, flexShrink: 0,
+              }}>
+                {[["search", "Search"], ["portfolio", "Portfolio"]].map(([page, label]) => (
+                  <button
+                    key={page}
+                    onClick={() => setActivePage(page)}
+                    style={{
+                      background: activePage === page ? T.primary : "transparent",
+                      color: activePage === page ? "#fff" : T.textSecondary,
+                      border: "none", borderRadius: 2, padding: "6px 14px",
+                      fontSize: 11, fontWeight: 700,
+                      cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                      letterSpacing: "0.08em", textTransform: "uppercase",
+                      transition: "background .15s, color .15s",
+                    }}
+                  >{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {user ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: T.textMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {user.email}
+                </span>
+                <button
+                  onClick={logout}
+                  style={{
+                    background: "transparent", border: `1px solid ${T.border}`,
+                    borderRadius: 3, color: T.textSecondary,
+                    fontSize: 11, fontWeight: 700, padding: "6px 12px",
+                    cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                    letterSpacing: "0.07em", textTransform: "uppercase",
+                  }}
+                >Sign out</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setAuthModalTab("login"); setAuthModalOpen(true); }}
+                style={{
+                  background: T.primary, border: "none", borderRadius: 3,
+                  color: "#fff", fontSize: 11, fontWeight: 700,
+                  padding: "8px 16px", cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                  flexShrink: 0, letterSpacing: "0.08em", textTransform: "uppercase",
+                }}
+              >Sign in</button>
+            )}
+          </div>
         )}
       </header>
 
