@@ -25,6 +25,8 @@ export default async function handler(request) {
   const ticker = symbol.trim().toUpperCase();
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1mo&range=30y`;
 
+  console.log(`[history] Fetching: ${url}`);
+
   let yahooRes;
   try {
     yahooRes = await fetch(url, {
@@ -68,21 +70,62 @@ export default async function handler(request) {
   }
 
   const timestamps = result.timestamp ?? [];
-  const closes = result.indicators?.quote?.[0]?.close ?? [];
-  const currency = result.meta?.currency ?? '';
+  const closes    = result.indicators?.quote?.[0]?.close ?? [];
+  const adjCloses = result.indicators?.adjclose?.[0]?.adjclose ?? [];
+  const currency  = result.meta?.currency ?? '';
+
+  // Log raw data for debugging — first 5 and last 5 values
+  const first5ts = timestamps.slice(0, 5).map((ts, i) => ({
+    date: new Date(ts * 1000).toISOString().slice(0, 7),
+    close: closes[i],
+    adjclose: adjCloses[i],
+  }));
+  const last5ts = timestamps.slice(-5).map((ts, i) => {
+    const idx = timestamps.length - 5 + i;
+    return {
+      date: new Date(ts * 1000).toISOString().slice(0, 7),
+      close: closes[idx],
+      adjclose: adjCloses[idx],
+    };
+  });
+  console.log(`[history] ${ticker} — ${timestamps.length} data points`);
+  console.log(`[history] Date range: ${first5ts[0]?.date} → ${last5ts[last5ts.length - 1]?.date}`);
+  console.log(`[history] First 5 raw:`, JSON.stringify(first5ts));
+  console.log(`[history] Last 5 raw:`, JSON.stringify(last5ts));
+
+  // Use close prices; adjclose is preferred for stocks but close is more reliable
+  // for crypto (Yahoo sometimes returns null adjclose for crypto)
+  const priceSource = closes.some((v) => v != null) ? closes : adjCloses;
 
   const data = timestamps
     .map((ts, i) => ({
       date: new Date(ts * 1000).toISOString().slice(0, 7),
-      price: closes[i] != null ? parseFloat(closes[i].toFixed(2)) : null,
+      price: priceSource[i] != null ? parseFloat(priceSource[i].toFixed(2)) : null,
     }))
-    .filter((d) => d.price != null);
+    .filter((d) => d.price != null && d.price > 0);
 
   if (!data.length) {
     return new Response(JSON.stringify({ error: 'No price data available' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // Log CAGR debug for each standard period
+  const lastPoint  = data[data.length - 1];
+  const lastPrice  = lastPoint.price;
+  const lastYear   = parseInt(lastPoint.date.slice(0, 4));
+  const lastMoPad  = lastPoint.date.slice(5, 7);
+
+  for (const years of [5, 10, 15, 20, 25, 30]) {
+    const targetDate = `${lastYear - years}-${lastMoPad}`;
+    const entry = data.find((d) => d.date >= targetDate);
+    if (!entry) {
+      console.log(`[history] CAGR ${years}Y: no data (history too short — earliest: ${data[0].date})`);
+      continue;
+    }
+    const cagr = ((Math.pow(lastPrice / entry.price, 1 / years) - 1) * 100).toFixed(1);
+    console.log(`[history] CAGR ${years}Y: start ${entry.date} @ ${entry.price} → end ${lastPoint.date} @ ${lastPrice} = ${cagr}%`);
   }
 
   return new Response(JSON.stringify({ data, currency }), {
