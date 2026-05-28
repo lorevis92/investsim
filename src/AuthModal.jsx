@@ -131,7 +131,7 @@ export default function AuthModal({ open, onClose, defaultTab = "login", onSucce
             fontSize: 15, fontWeight: 800, color: T.primary,
             letterSpacing: "0.12em", textTransform: "uppercase",
             fontFamily: "'Syne', sans-serif",
-          }}>NVESTIN</span>
+          }}>NVESTING</span>
           <button
             onClick={close}
             style={{ background: "transparent", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 2 }}

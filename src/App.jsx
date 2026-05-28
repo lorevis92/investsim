@@ -1934,7 +1934,7 @@ export default function App() {
                   fontSize: 13, fontWeight: 800, color: T.primary,
                   textTransform: "uppercase", letterSpacing: "0.10em",
                   fontFamily: "'Syne', sans-serif",
-                }}>NVESTIN</span>
+                }}>NVESTING</span>
               </div>
 
               {user ? (
@@ -2003,7 +2003,7 @@ export default function App() {
                   fontSize: 16, fontWeight: 800, color: T.primary,
                   textTransform: "uppercase", letterSpacing: "0.10em",
                   fontFamily: "'Syne', sans-serif",
-                }}>NVESTIN</span>
+                }}>NVESTING</span>
               </div>
 
               <div style={{
