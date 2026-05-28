@@ -87,8 +87,7 @@ const TTL_AI = 90 * 24 * 60 * 60 * 1000;
 
 async function fetchStockInfo(query, cacheRef) {
   console.log("[search] fetchStockInfo called with:", query);
-  const key        = query.trim().toLowerCase();
-  const searchTerm = query.trim();
+  const key = query.trim().toLowerCase();
 
   // STEP 1: Cerca in memoria React (istantaneo)
   if (cacheRef?.current?.[key]) {
@@ -110,50 +109,7 @@ async function fetchStockInfo(query, cacheRef) {
     };
   }
 
-  // STEP 2: Cerca in Supabase (~100ms)
-  try {
-    const { data } = await supabase
-      .from("stocks")
-      .select("*")
-      .or(`symbol.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`)
-      .not("ai_updated_at", "is", null)
-      .order("ai_updated_at", { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
-
-    console.log("[search] Supabase direct:", data?.symbol, "ai_updated_at:", data?.ai_updated_at);
-
-    if (data?.ai_updated_at && data?.name && data?.description) {
-      const aiAge = Date.now() - new Date(data.ai_updated_at).getTime();
-      if (aiAge < TTL_AI) {
-        console.log("[search] SUPABASE HIT for:", data.symbol);
-        const result = {
-          symbol:       data.symbol,
-          yahoo_symbol: data.yahoo_symbol,
-          name:         data.name,
-          type:         data.type,
-          category:     data.category,
-          currentPrice: data.current_price,
-          currency:     data.currency,
-          description:  data.description,
-          risk:         data.risk,
-          sector:       data.sector,
-          explanation:  data.explanation,
-          returns: {
-            pessimistic: data.return_pessimistic,
-            base:        data.return_base,
-            optimistic:  data.return_optimistic,
-          },
-        };
-        if (cacheRef) cacheRef.current[key] = result;
-        return result;
-      }
-    }
-  } catch (e) {
-    console.log("[search] Supabase error:", e.message);
-  }
-
-  // STEP 3: Cache miss — chiama backend
+  // STEP 2: Cache miss — chiama backend
   console.log("[search] BACKEND CALL for:", query);
   const res = await fetch("/api/search", {
     method: "POST",
@@ -163,7 +119,17 @@ async function fetchStockInfo(query, cacheRef) {
   if (!res.ok) throw new Error(`API error ${res.status}`);
   const result = await res.json();
   if (cacheRef && result.symbol && result.symbol !== "NOT_FOUND") {
-    cacheRef.current[key] = result;
+    const keys = [
+      query.trim().toLowerCase(),
+      result.symbol.toLowerCase(),
+      result.name?.toLowerCase(),
+    ];
+    result.name?.toLowerCase().split(/\s+/).forEach((word) => {
+      if (word.length > 2) keys.push(word);
+    });
+    [...new Set(keys)].forEach((k) => {
+      if (k) cacheRef.current[k] = result;
+    });
   }
   return result;
 }
