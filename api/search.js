@@ -223,11 +223,12 @@ export default async function handler(request) {
       return_pessimistic: returns.pessimistic,
       return_base:        returns.base,
       return_optimistic:  returns.optimistic,
-      ai_updated_at:      new Date(now).toISOString(),
+      ai_updated_at:      new Date().toISOString(),
     };
 
-    await supabase.from('stocks').upsert(aiFields, { onConflict: 'symbol' });
-    console.log(`[search] AI upserted: ${aiFields.symbol} (yahoo: ${aiFields.yahoo_symbol})`);
+    const { error: aiUpsertErr } = await supabase.from('stocks').upsert(aiFields, { onConflict: 'symbol' });
+    if (aiUpsertErr) console.log(`[search] AI upsert ERROR for ${aiFields.symbol}:`, aiUpsertErr.message);
+    else console.log(`[search] AI upserted: ${aiFields.symbol} (yahoo: ${aiFields.yahoo_symbol}, ai_updated_at: ${aiFields.ai_updated_at})`);
 
     row = { ...row, ...aiFields };
   }
@@ -249,9 +250,11 @@ export default async function handler(request) {
         symbol:           row.symbol,
         current_price:    priceInfo.price,
         currency:         priceInfo.currency,
-        price_updated_at: new Date(now).toISOString(),
+        price_updated_at: new Date().toISOString(),
       };
-      await supabase.from('stocks').upsert(priceFields, { onConflict: 'symbol' });
+      const { error: priceUpsertErr } = await supabase.from('stocks').upsert(priceFields, { onConflict: 'symbol' });
+      if (priceUpsertErr) console.log(`[search] Price upsert ERROR for ${row.symbol}:`, priceUpsertErr.message);
+      else console.log(`[search] Price upserted: ${row.symbol} @ ${priceInfo.price} ${priceInfo.currency} (price_updated_at: ${priceFields.price_updated_at})`);
       row = { ...row, ...priceFields };
     } else {
       console.log(`[search] Yahoo price fetch failed for ${yahooSym}`);
