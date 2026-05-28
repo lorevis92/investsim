@@ -109,7 +109,61 @@ async function fetchStockInfo(query, cacheRef) {
     };
   }
 
-  // STEP 2: Cache miss — chiama backend
+  // STEP 2: Cerca in Supabase con search_terms (~100ms, nessun cold start)
+  try {
+    let sbData = null;
+
+    const { data: d1 } = await supabase
+      .from("stocks")
+      .select("*")
+      .contains("search_terms", [key])
+      .not("ai_updated_at", "is", null)
+      .limit(1)
+      .maybeSingle();
+    sbData = d1 ?? null;
+
+    if (!sbData) {
+      const { data: d2 } = await supabase
+        .from("stocks")
+        .select("*")
+        .ilike("symbol", `${query.trim()}%`)
+        .not("ai_updated_at", "is", null)
+        .limit(1)
+        .maybeSingle();
+      sbData = d2 ?? null;
+    }
+
+    if (sbData?.ai_updated_at && sbData?.name && sbData?.description) {
+      const aiAge = Date.now() - new Date(sbData.ai_updated_at).getTime();
+      if (aiAge < TTL_AI) {
+        console.log("[search] SUPABASE HIT for:", sbData.symbol);
+        const result = {
+          symbol:       sbData.symbol,
+          yahoo_symbol: sbData.yahoo_symbol,
+          name:         sbData.name,
+          type:         sbData.type,
+          category:     sbData.category,
+          currentPrice: sbData.current_price,
+          currency:     sbData.currency,
+          description:  sbData.description,
+          risk:         sbData.risk,
+          sector:       sbData.sector,
+          explanation:  sbData.explanation,
+          returns: {
+            pessimistic: sbData.return_pessimistic,
+            base:        sbData.return_base,
+            optimistic:  sbData.return_optimistic,
+          },
+        };
+        if (cacheRef) cacheRef.current[key] = result;
+        return result;
+      }
+    }
+  } catch (e) {
+    console.log("[search] Supabase error:", e.message);
+  }
+
+  // STEP 3: Cache miss — chiama backend
   console.log("[search] BACKEND CALL for:", query);
   const res = await fetch("/api/search", {
     method: "POST",

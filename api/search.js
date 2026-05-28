@@ -133,19 +133,31 @@ export default async function handler(request) {
   const now = Date.now();
   const q = query.trim();
 
-  // --- Look up existing DB record (no global TTL — each layer checks its own) ---
+  // --- Look up existing DB record ---
   let cached = null;
 
-  // 1. Exact symbol match
-  const { data: exactMatch } = await supabase
+  // 1. search_terms array contains the query (most reliable)
+  const { data: termMatch } = await supabase
     .from('stocks')
     .select('*')
-    .eq('symbol', q.toUpperCase())
+    .contains('search_terms', [q.toLowerCase()])
     .not('name', 'is', null)
+    .limit(1)
     .maybeSingle();
-  cached = exactMatch ?? null;
+  cached = termMatch ?? null;
 
-  // 2. Name ILIKE fallback
+  // 2. Exact symbol match (for rows predating search_terms)
+  if (!cached) {
+    const { data: exactMatch } = await supabase
+      .from('stocks')
+      .select('*')
+      .eq('symbol', q.toUpperCase())
+      .not('name', 'is', null)
+      .maybeSingle();
+    cached = exactMatch ?? null;
+  }
+
+  // 3. Name ILIKE fallback
   if (!cached) {
     const { data: nameMatch } = await supabase
       .from('stocks')
@@ -165,6 +177,14 @@ export default async function handler(request) {
 
   if (!aiStale) {
     console.log(`[search] AI cache HIT: ${row.symbol} (age ${Math.round(aiAge / 86400000)}d)`);
+    // Add current query to search_terms if not already present
+    if (!cached.search_terms?.includes(q.toLowerCase())) {
+      const updated = [...new Set([...(cached.search_terms ?? []), q.toLowerCase()])];
+      supabase.from('stocks').update({ search_terms: updated }).eq('symbol', cached.symbol).then(({ error }) => {
+        if (error) console.log(`[search] search_terms update error:`, error.message);
+        else console.log(`[search] search_terms updated for ${cached.symbol}: added "${q.toLowerCase()}"`);
+      });
+    }
   } else {
     console.log(`[search] AI cache MISS for "${q}" — calling Claude`);
 
@@ -209,7 +229,15 @@ export default async function handler(request) {
       });
     }
 
-    const returns   = RETURN_BENCHMARKS[aiResult.category] ?? RETURN_BENCHMARKS.speculative;
+    const returns      = RETURN_BENCHMARKS[aiResult.category] ?? RETURN_BENCHMARKS.speculative;
+    const searchTerms  = [
+      aiResult.symbol.toLowerCase(),
+      aiResult.yahoo_symbol?.toLowerCase(),
+      ...aiResult.name.toLowerCase().split(/\s+/).filter((w) => w.length > 2),
+      q.toLowerCase(),
+    ].filter(Boolean);
+    // Preserve any extra terms already in DB (e.g. from previous searches)
+    const existingTerms = cached?.search_terms ?? [];
     const aiFields  = {
       symbol:             aiResult.symbol,
       yahoo_symbol:       aiResult.yahoo_symbol ?? aiResult.symbol,
@@ -223,6 +251,7 @@ export default async function handler(request) {
       return_pessimistic: returns.pessimistic,
       return_base:        returns.base,
       return_optimistic:  returns.optimistic,
+      search_terms:       [...new Set([...existingTerms, ...searchTerms])],
       ai_updated_at:      new Date().toISOString(),
     };
 
