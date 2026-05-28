@@ -1044,7 +1044,7 @@ function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverrid
       </ResponsiveContainer>
 
       {/* DCA milestone cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginTop: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))", gap: 8, marginTop: 18 }}>
         {MILESTONES.map((y) => {
           const inv = monthly * 12 * y;
           return (
@@ -1598,8 +1598,19 @@ const makePortfolio = () => {
   };
 };
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+}
+
 export default function App() {
   const { user, logout } = useAuth();
+  const isMobile = useIsMobile();
 
   const [portfolios, setPortfolios] = useState([makePortfolio()]);
   const [selectedPf, setSelectedPf] = useState(1);
@@ -1666,6 +1677,11 @@ export default function App() {
   useEffect(() => {
     if (activePage !== "portfolio") setDetailStock(null);
   }, [activePage]);
+
+  useEffect(() => {
+    document.body.style.overflowX = "hidden";
+    document.documentElement.style.overflowX = "hidden";
+  }, []);
 
   const loadAllOverrides = async (u) => {
     if (u) {
@@ -1914,7 +1930,7 @@ export default function App() {
             <img
               src="/logo-wisi.png"
               alt="WisiInvest"
-              style={{ height: 44, width: "auto", objectFit: "contain" }}
+              style={{ height: isMobile ? 34 : 44, width: "auto", objectFit: "contain" }}
             />
             <span style={{
               fontSize: 16, fontWeight: 800, color: T.primary,
@@ -1935,8 +1951,9 @@ export default function App() {
                 style={{
                   background: activePage === page ? T.primary : "transparent",
                   color: activePage === page ? "#fff" : T.textSecondary,
-                  border: "none", borderRadius: 2, padding: "6px 14px",
-                  fontSize: 11, fontWeight: 700,
+                  border: "none", borderRadius: 2,
+                  padding: isMobile ? "6px 10px" : "6px 14px",
+                  fontSize: isMobile ? 10 : 11, fontWeight: 700,
                   cursor: "pointer", fontFamily: "'Syne', sans-serif",
                   letterSpacing: "0.08em", textTransform: "uppercase",
                   transition: "background .15s, color .15s",
@@ -1948,9 +1965,11 @@ export default function App() {
 
         {user ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            <span style={{ fontSize: 11, color: T.textMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {user.email}
-            </span>
+            {!isMobile && (
+              <span style={{ fontSize: 11, color: T.textMuted, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {user.email}
+              </span>
+            )}
             <button
               onClick={logout}
               style={{
@@ -1976,7 +1995,7 @@ export default function App() {
       </header>
 
       {/* Main */}
-      <main style={{ padding: "28px 20px", maxWidth: 720, margin: "0 auto" }}>
+      <main style={{ padding: isMobile ? "16px" : "28px 20px", maxWidth: isMobile ? "100%" : 720, margin: "0 auto", boxSizing: "border-box", width: "100%" }}>
         {activePage === "search" && (
           <>
             <SearchPanel
