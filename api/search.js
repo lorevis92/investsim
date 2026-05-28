@@ -14,41 +14,46 @@ const RETURN_BENCHMARKS = {
   speculative:      { pessimistic: -20, base: 12, optimistic: 45 },
 };
 
+const TTL_AI    = 90 * 24 * 60 * 60 * 1000; // 90 days
+const TTL_PRICE = 15 * 60 * 1000;            // 15 minutes
+
 const SYSTEM_PROMPT = `IMPORTANT: Always respond in English. All text fields (description, explanation, historical, currentContext, riskFactors, methodology) must be written in English regardless of the language used in the search query.
 
-Sei un assistente finanziario esperto. L'utente cerca informazioni su un titolo azionario, ETF o indice per simulare un investimento DCA a lungo termine.
-Rispondi SOLO con un oggetto JSON valido, nessun testo aggiuntivo, nessun markdown, nessuna backtick.
-Il JSON deve avere questa struttura:
+You are an expert financial assistant. The user is searching for a stock, ETF, or index to simulate a long-term DCA investment.
+Respond ONLY with a valid JSON object — no additional text, no markdown, no backticks.
+The JSON must have this exact structure:
 {
   "symbol": "TICKER",
-  "name": "Nome completo",
+  "yahoo_symbol": "TICKER_FOR_YAHOO_FINANCE",
+  "name": "Full name",
   "type": "ETF|Stock|Index",
   "category": "etf_global|etf_sp500|etf_nasdaq|large_cap_stable|growth_tech|small_mid_cap|bonds|crypto_etf|speculative",
-  "currentPrice": 123.45,
   "currency": "USD",
-  "description": "Descrizione breve 2-3 frasi",
+  "description": "Brief description 2-3 sentences",
   "risk": "Low|Medium|High|Very High",
   "sector": "Technology|Finance|etc",
   "explanation": {
-    "historical": "Descrivi in linguaggio semplice la performance storica di questo titolo negli ultimi 20-30 anni — niente gergo finanziario",
-    "currentContext": "Contesto attuale del titolo — settore, momento, valutazione — in 2-3 frasi accessibili a chi non investe",
-    "riskFactors": "I principali fattori che potrebbero far andare meglio o peggio — in 2-3 frasi semplici",
-    "methodology": "Spiega che i rendimenti mostrati sono nominali (quello che si vede sul conto, prima dell'inflazione) e come sono stati costruiti i tre scenari pessimistico, base, ottimistico basati su benchmark storici reali a 20-30 anni"
+    "historical": "Describe in simple language the historical performance of this asset over the last 20-30 years — no financial jargon",
+    "currentContext": "Current context of the asset — sector, momentum, valuation — in 2-3 sentences accessible to non-investors",
+    "riskFactors": "The main factors that could make it perform better or worse — in 2-3 simple sentences",
+    "methodology": "Explain that the returns shown are nominal (what you see in the account, before inflation) and how the three pessimistic, base, optimistic scenarios were built based on real 20-30 year historical benchmarks"
   }
 }
-Linee guida per la classificazione della categoria:
-- etf_global: ETF su indici mondiali diversificati (MSCI World, All World, VT, VWCE)
-- etf_sp500: ETF sull'S&P 500 (SPY, VOO, IVV, CSPX)
-- etf_nasdaq: ETF sul Nasdaq (QQQ, QQQM, EQQQ)
-- large_cap_stable: Titoli azionari di grandi aziende mature e stabili (Apple, Microsoft, Berkshire, Johnson & Johnson, Nestlé)
-- growth_tech: Titoli ad alta crescita o aziende tech aggressive (NVIDIA, Tesla, Amazon, Meta)
-- small_mid_cap: Titoli di aziende di piccola-media capitalizzazione
-- bonds: Obbligazioni, ETF obbligazionari, titoli di stato
-- crypto_etf: ETF su criptovalute o criptovalute dirette (Bitcoin ETF, Ethereum ETF, BTC, ETH)
-- speculative: Tutto il resto — asset speculativi, indici settoriali, materie prime, asset non classificabili
-Per richieste vaghe o non trovate, metti symbol: "NOT_FOUND" e category: "speculative".`;
-
-const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+Guidelines for yahoo_symbol:
+- For most stocks and ETFs: yahoo_symbol equals symbol (e.g. AAPL, VOO, QQQ, VWCE.DE)
+- For cryptocurrencies: append -USD (e.g. BTC → BTC-USD, ETH → ETH-USD, SOL → SOL-USD)
+- For major indices: use Yahoo Finance ticker (e.g. S&P 500 → ^GSPC, Nasdaq Composite → ^IXIC, Dow Jones → ^DJI)
+Category guidelines:
+- etf_global: ETFs on diversified global indices (MSCI World, All World, VT, VWCE)
+- etf_sp500: ETFs on S&P 500 (SPY, VOO, IVV, CSPX)
+- etf_nasdaq: ETFs on Nasdaq (QQQ, QQQM, EQQQ)
+- large_cap_stable: Large stable blue-chip stocks (Apple, Microsoft, Berkshire, Johnson & Johnson, Nestlé)
+- growth_tech: High-growth or aggressive tech stocks (NVIDIA, Tesla, Amazon, Meta)
+- small_mid_cap: Small to mid-cap stocks
+- bonds: Bonds, bond ETFs, government bonds
+- crypto_etf: Cryptocurrency ETFs or direct crypto (Bitcoin ETF, Ethereum ETF, BTC, ETH)
+- speculative: Everything else — speculative assets, sector indices, commodities, unclassifiable assets
+For vague or not-found requests, set symbol: "NOT_FOUND" and category: "speculative".`;
 
 function getSupabase() {
   return createClient(
@@ -58,23 +63,47 @@ function getSupabase() {
   );
 }
 
-function mapToApiShape(row) {
+async function fetchCurrentPrice(yahooSymbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=5d`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const result = json?.chart?.result?.[0];
+    if (!result) return null;
+    const closes = result.indicators?.quote?.[0]?.close ?? [];
+    const validCloses = closes.filter((v) => v != null);
+    if (!validCloses.length) return null;
+    const price = parseFloat(validCloses[validCloses.length - 1].toFixed(2));
+    const currency = result.meta?.currency ?? 'USD';
+    return { price, currency };
+  } catch {
+    return null;
+  }
+}
+
+function buildResponse(row) {
+  const category = row.category ?? 'speculative';
+  const returns = RETURN_BENCHMARKS[category] ?? RETURN_BENCHMARKS.speculative;
   return {
-    symbol: row.symbol,
-    name: row.name,
-    type: row.type,
-    category: row.category ?? null,
-    returns: {
-      pessimistic: row.return_pessimistic,
-      base: row.return_base,
-      optimistic: row.return_optimistic,
-    },
-    risk: row.risk,
-    sector: row.sector,
-    description: row.description,
-    currentPrice: row.current_price,
-    currency: row.currency,
-    explanation: row.explanation ?? null,
+    symbol:       row.symbol,
+    yahoo_symbol: row.yahoo_symbol ?? row.symbol,
+    name:         row.name,
+    type:         row.type,
+    category,
+    returns,
+    risk:         row.risk,
+    sector:       row.sector,
+    description:  row.description,
+    currentPrice: row.current_price ?? null,
+    currency:     row.currency ?? null,
+    explanation:  row.explanation ?? null,
   };
 }
 
@@ -101,101 +130,135 @@ export default async function handler(request) {
   }
 
   const supabase = getSupabase();
-  const cutoff = new Date(Date.now() - CACHE_TTL_MS).toISOString();
+  const now = Date.now();
   const q = query.trim();
 
-  // 1. Exact symbol match (e.g. user types "AAPL")
-  let { data: cached } = await supabase
+  // --- Look up existing DB record (no global TTL — each layer checks its own) ---
+  let cached = null;
+
+  // 1. Exact symbol match
+  const { data: exactMatch } = await supabase
     .from('stocks')
     .select('*')
     .eq('symbol', q.toUpperCase())
     .not('name', 'is', null)
-    .gt('updated_at', cutoff)
     .maybeSingle();
+  cached = exactMatch ?? null;
 
-  // 2. Name ILIKE fallback (e.g. user types "Apple" → matches "Apple Inc.")
+  // 2. Name ILIKE fallback
   if (!cached) {
-    const { data: rows } = await supabase
+    const { data: nameMatch } = await supabase
       .from('stocks')
       .select('*')
       .ilike('name', `%${q}%`)
       .not('name', 'is', null)
-      .gt('updated_at', cutoff)
       .limit(1);
-    cached = rows?.[0] ?? null;
+    cached = nameMatch?.[0] ?? null;
   }
 
-  if (cached) {
-    console.log(`CACHE HIT: ${cached.symbol} — "${cached.name}" (query: "${q}")`);
-    return new Response(JSON.stringify(mapToApiShape(cached)), {
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  // Working row — merged in-memory as each layer resolves
+  let row = cached ? { ...cached } : {};
 
-  console.log(`CACHE MISS for query: "${q}"`);
-  // Cache miss — call Claude API
-  const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1500,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: `Cerca: ${query}` }],
-    }),
-  });
+  // ── Layer 1: AI data (TTL 90 days) ──────────────────────────────────────────
+  const aiAge   = cached?.ai_updated_at ? now - new Date(cached.ai_updated_at).getTime() : Infinity;
+  const aiStale = aiAge > TTL_AI;
 
-  if (!anthropicRes.ok) {
-    return new Response(JSON.stringify({ error: 'Upstream API error' }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  if (!aiStale) {
+    console.log(`[search] AI cache HIT: ${row.symbol} (age ${Math.round(aiAge / 86400000)}d)`);
+  } else {
+    console.log(`[search] AI cache MISS for "${q}" — calling Claude`);
 
-  const data = await anthropicRes.json();
-  const text = data.content?.find((b) => b.type === 'text')?.text || '{}';
-
-  let result;
-  try {
-    result = JSON.parse(text.replace(/```json|```/g, '').trim());
-  } catch {
-    return new Response(JSON.stringify({ error: 'Parse error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  // Apply fixed benchmarks — numbers always come from the dictionary, never from AI
-  result.returns = RETURN_BENCHMARKS[result.category] ?? RETURN_BENCHMARKS.speculative;
-
-  // Persist to DB if valid result
-  if (result.symbol && result.symbol !== 'NOT_FOUND' && result.category) {
-    await supabase.from('stocks').upsert(
-      {
-        symbol: result.symbol,
-        name: result.name,
-        type: result.type,
-        category: result.category,
-        return_pessimistic: result.returns.pessimistic,
-        return_base: result.returns.base,
-        return_optimistic: result.returns.optimistic,
-        risk: result.risk,
-        sector: result.sector,
-        description: result.description,
-        current_price: result.currentPrice ?? null,
-        currency: result.currency ?? null,
-        explanation: result.explanation ?? null,
-        updated_at: new Date().toISOString(),
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
       },
-      { onConflict: 'symbol' }
-    );
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1500,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: `Search: ${query}` }],
+      }),
+    });
+
+    if (!anthropicRes.ok) {
+      return new Response(JSON.stringify({ error: 'Upstream API error' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const claudeJson = await anthropicRes.json();
+    const text = claudeJson.content?.find((b) => b.type === 'text')?.text || '{}';
+
+    let aiResult;
+    try {
+      aiResult = JSON.parse(text.replace(/```json|```/g, '').trim());
+    } catch {
+      return new Response(JSON.stringify({ error: 'Parse error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!aiResult.symbol || aiResult.symbol === 'NOT_FOUND') {
+      return new Response(JSON.stringify({ symbol: 'NOT_FOUND' }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const returns   = RETURN_BENCHMARKS[aiResult.category] ?? RETURN_BENCHMARKS.speculative;
+    const aiFields  = {
+      symbol:             aiResult.symbol,
+      yahoo_symbol:       aiResult.yahoo_symbol ?? aiResult.symbol,
+      name:               aiResult.name,
+      type:               aiResult.type,
+      category:           aiResult.category,
+      risk:               aiResult.risk,
+      sector:             aiResult.sector,
+      description:        aiResult.description,
+      explanation:        aiResult.explanation ?? null,
+      return_pessimistic: returns.pessimistic,
+      return_base:        returns.base,
+      return_optimistic:  returns.optimistic,
+      ai_updated_at:      new Date(now).toISOString(),
+    };
+
+    await supabase.from('stocks').upsert(aiFields, { onConflict: 'symbol' });
+    console.log(`[search] AI upserted: ${aiFields.symbol} (yahoo: ${aiFields.yahoo_symbol})`);
+
+    row = { ...row, ...aiFields };
   }
 
-  return new Response(JSON.stringify(result), {
+  // ── Layer 2: Current price (TTL 15 minutes) ──────────────────────────────────
+  const priceAge   = row.price_updated_at ? now - new Date(row.price_updated_at).getTime() : Infinity;
+  const priceStale = priceAge > TTL_PRICE;
+
+  if (!priceStale) {
+    console.log(`[search] Price cache HIT: ${row.symbol} @ ${row.current_price} ${row.currency} (age ${Math.round(priceAge / 60000)}min)`);
+  } else {
+    const yahooSym = row.yahoo_symbol ?? row.symbol;
+    console.log(`[search] Price cache MISS for ${yahooSym} — fetching from Yahoo`);
+
+    const priceInfo = await fetchCurrentPrice(yahooSym);
+    if (priceInfo) {
+      console.log(`[search] Yahoo price: ${priceInfo.price} ${priceInfo.currency}`);
+      const priceFields = {
+        symbol:           row.symbol,
+        current_price:    priceInfo.price,
+        currency:         priceInfo.currency,
+        price_updated_at: new Date(now).toISOString(),
+      };
+      await supabase.from('stocks').upsert(priceFields, { onConflict: 'symbol' });
+      row = { ...row, ...priceFields };
+    } else {
+      console.log(`[search] Yahoo price fetch failed for ${yahooSym}`);
+    }
+  }
+
+  return new Response(JSON.stringify(buildResponse(row)), {
     headers: { 'Content-Type': 'application/json' },
   });
 }
