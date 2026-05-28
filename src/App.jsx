@@ -83,53 +83,32 @@ const getReturns = (symbol, aiReturns, overridesMap) => ({
 });
 
 // ─── AI FETCH ─────────────────────────────────────────────────────────────────
-const TTL_AI    = 90 * 24 * 60 * 60 * 1000;
-const TTL_PRICE = 15 * 60 * 1000;
+const TTL_AI = 90 * 24 * 60 * 60 * 1000;
 
 async function fetchStockInfo(query) {
   console.log("[search] fetchStockInfo called with:", query);
+  const searchTerm = query.trim();
 
-  const q   = query.trim();
-  const now = Date.now();
-
-  // 1. Check Supabase directly — zero backend roundtrip if cache is warm
+  // STEP 1: Cerca direttamente in Supabase dal frontend
   try {
-    const searchTerm = query.trim();
-    console.log("[search] searching Supabase for:", searchTerm);
-
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("stocks")
       .select("*")
       .or(`symbol.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`)
-      .order("ai_updated_at", { ascending: false })
+      .order("ai_updated_at", { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle();
 
-    console.log("[search] raw data:", JSON.stringify(data));
-    console.log("[search] Supabase result:", {
-      found:            !!data,
-      symbol:           data?.symbol,
-      ai_updated_at:    data?.ai_updated_at,
-      price_updated_at: data?.price_updated_at,
-      error,
-    });
+    console.log("[search] Supabase direct:", data?.symbol, "ai_updated_at:", data?.ai_updated_at);
 
-    if (data) {
-      const aiAge    = data.ai_updated_at    ? now - new Date(data.ai_updated_at).getTime()    : Infinity;
-      const priceAge = data.price_updated_at ? now - new Date(data.price_updated_at).getTime() : Infinity;
+    if (data?.ai_updated_at && data?.name && data?.description) {
+      const aiAge = Date.now() - new Date(data.ai_updated_at).getTime();
 
-      console.log("[search] TTL check:", {
-        aiAgeDays:       Math.round(aiAge / 86400000),
-        priceAgeMinutes: Math.round(priceAge / 60000),
-        aiOk:            aiAge < TTL_AI,
-        priceOk:         priceAge < TTL_PRICE,
-      });
-
-      if (aiAge < TTL_AI && priceAge < TTL_PRICE) {
-        console.log("[search] full cache HIT — returning Supabase data for", data.symbol);
+      if (aiAge < TTL_AI) {
+        console.log("[search] FRONTEND CACHE HIT — skipping backend entirely");
         return {
           symbol:       data.symbol,
-          yahoo_symbol: data.yahoo_symbol ?? data.symbol,
+          yahoo_symbol: data.yahoo_symbol,
           name:         data.name,
           type:         data.type,
           category:     data.category,
@@ -146,16 +125,13 @@ async function fetchStockInfo(query) {
           },
         };
       }
-
-      console.log("[search] cache STALE — falling through to /api/search");
-    } else {
-      console.log("[search] not in Supabase — calling /api/search");
     }
   } catch (e) {
-    console.log("[search] Supabase error, falling through to /api/search:", e?.message);
+    console.log("[search] Supabase direct error:", e.message);
   }
 
-  // 2. Cache miss or stale → call /api/search which refreshes what's needed
+  // STEP 2: Cache miss o dati scaduti — chiama il backend
+  console.log("[search] CACHE MISS — calling /api/search");
   const res = await fetch("/api/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
