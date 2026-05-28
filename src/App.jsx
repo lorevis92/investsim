@@ -94,13 +94,14 @@ async function fetchStockInfo(query) {
 
   // 1. Check Supabase directly — zero backend roundtrip if cache is warm
   try {
-    console.log("[search] checking Supabase cache for:", q.toUpperCase());
+    console.log("[search] checking Supabase cache for:", q);
 
     const { data, error } = await supabase
       .from("stocks")
       .select("*")
-      .or(`symbol.eq.${q.toUpperCase()},name.ilike.%${q}%`)
-      .not("name", "is", null)
+      .or(`symbol.ilike.%${q}%,name.ilike.%${q}%`)
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     console.log("[search] Supabase result:", {
