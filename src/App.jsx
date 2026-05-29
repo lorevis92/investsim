@@ -331,7 +331,7 @@ function ExplanationSection({ explanation }) {
 }
 
 // ─── SEARCH PANEL ─────────────────────────────────────────────────────────────
-function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverride, cacheRef }) {
+function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveOverride, resetOverride, cacheRef }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -423,6 +423,50 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
           <p style={{ fontSize: 15, color: T.textSecondary, margin: "0 0 36px", lineHeight: 1.75, maxWidth: 440, marginLeft: "auto", marginRight: "auto" }}>
             Search for a stock, ETF or index — see how much your investment could be worth over time.
           </p>
+
+          {/* Starter templates preview */}
+          <div style={{ marginBottom: 36 }}>
+            <p style={{
+              fontSize: 11, color: T.textMuted, marginBottom: 12,
+              letterSpacing: "0.08em", textTransform: "uppercase",
+              fontFamily: "'Syne', sans-serif",
+            }}>
+              Need inspiration? →
+            </p>
+            <div style={{
+              display: "flex", gap: 8, overflowX: "auto",
+              paddingBottom: 4,
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            }}>
+              {STARTER_PORTFOLIOS.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => onOpenStarterModal()}
+                  style={{
+                    flexShrink: 0,
+                    background: T.surface,
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 4, padding: "8px 14px",
+                    cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                    display: "flex", alignItems: "center", gap: 7,
+                    transition: "border-color .15s",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = t.color}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = T.border}
+                >
+                  <span style={{ fontSize: 16 }}>{t.emoji}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.05em" }}>{t.name}</span>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: "1px 6px",
+                    borderRadius: 2, background: T.surfaceAlt,
+                    color: T.textMuted, letterSpacing: "0.06em", textTransform: "uppercase",
+                  }}>{t.risk}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -2406,6 +2450,7 @@ export default function App() {
               resetOverride={resetOverride}
               onAdd={(stock) => setAddModal({ open: true, stock })}
               onExplore={(s) => setExploreStock(s)}
+              onOpenStarterModal={() => setStarterModalOpen(true)}
               cacheRef={stockCacheRef}
             />
             {exploreStock && (
@@ -2447,13 +2492,25 @@ export default function App() {
               </>
             ) : (
               <>
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 24 }}>
+                  <button
+                    onClick={() => setStarterModalOpen(true)}
+                    style={{
+                      background: "transparent", color: T.textSecondary,
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 3, padding: "10px 16px",
+                      fontWeight: 700, fontSize: 11, cursor: "pointer",
+                      fontFamily: "'Syne', sans-serif",
+                      letterSpacing: "0.09em", textTransform: "uppercase",
+                    }}
+                  >Templates</button>
                   <button
                     onClick={() => setActivePage("search")}
                     style={{
                       background: T.primary, color: "#fff", border: "none",
                       borderRadius: 3, padding: "10px 20px",
-                      fontWeight: 700, fontSize: 11, cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                      fontWeight: 700, fontSize: 11, cursor: "pointer",
+                      fontFamily: "'Syne', sans-serif",
                       letterSpacing: "0.09em", textTransform: "uppercase",
                     }}
                   >+ Add asset</button>
