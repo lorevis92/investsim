@@ -375,7 +375,7 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
           transition: "opacity 0.2s ease",
           pointerEvents: searchOverlay.fading ? "none" : "auto",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 24 }}>
             <img src="/logo-wisi.png" alt="WisiInvesting" style={{ height: 60, width: "auto", objectFit: "contain" }} />
             <span style={{
               fontSize: 22, fontWeight: 800, color: "#E8352A",
