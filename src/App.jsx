@@ -1294,7 +1294,7 @@ function PortfolioCard({ portfolio, onSelect, onDelete, selected }) {
 }
 
 // ─── PORTFOLIO EDITOR ─────────────────────────────────────────────────────────
-function PortfolioEditor({ portfolio, onChange, onGoToSearch, onOpenDetail, overridesMap, saveOverride }) {
+function PortfolioEditor({ portfolio, onChange, onGoToSearch, onOpenDetail, overridesMap, saveOverride, onOpenStarterModal }) {
   const [mode, setMode] = useState("amount");
   const [scenarioMode, setScenarioMode] = useState("base");
   const totalMonthly = portfolio.holdings.reduce((s, h) => s + h.monthly, 0);
@@ -1382,6 +1382,19 @@ function PortfolioEditor({ portfolio, onChange, onGoToSearch, onOpenDetail, over
               letterSpacing: "0.09em", textTransform: "uppercase",
             }}
           >Add your first asset</button>
+          <button
+            onClick={onOpenStarterModal}
+            style={{
+              background: "transparent", border: `1px solid ${T.border}`,
+              borderRadius: 3, padding: "13px 28px",
+              fontWeight: 700, fontSize: 12, cursor: "pointer",
+              fontFamily: "'Syne', sans-serif",
+              letterSpacing: "0.09em", textTransform: "uppercase",
+              color: T.textSecondary, marginTop: 8,
+            }}
+          >
+            Or start from a template
+          </button>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
@@ -1688,6 +1701,79 @@ function AddToPortfolioModal({ stock, portfolios, onConfirm, onAddNew, onClose }
   );
 }
 
+// ─── STARTER PORTFOLIOS ───────────────────────────────────────────────────────
+const STARTER_PORTFOLIOS = [
+  {
+    id: "big-tech",
+    name: "Big Tech",
+    emoji: "🚀",
+    description: "The American tech giants — high growth potential over 20+ years.",
+    risk: "High",
+    color: "#7C4DFF",
+    holdings: [
+      { symbol: "AAPL", name: "Apple", pct: 30 },
+      { symbol: "MSFT", name: "Microsoft", pct: 30 },
+      { symbol: "NVDA", name: "Nvidia", pct: 20 },
+      { symbol: "GOOGL", name: "Alphabet", pct: 20 },
+    ],
+  },
+  {
+    id: "global-etf",
+    name: "Global ETF",
+    emoji: "🌍",
+    description: "Diversified exposure to world markets with low fees and low risk.",
+    risk: "Low",
+    color: "#00996A",
+    holdings: [
+      { symbol: "VTI", name: "US Total Market ETF", pct: 50 },
+      { symbol: "VXUS", name: "International ETF", pct: 30 },
+      { symbol: "BND", name: "Bond ETF", pct: 20 },
+    ],
+  },
+  {
+    id: "high-growth",
+    name: "High Growth",
+    emoji: "⚡",
+    description: "Aggressive growth mix — high risk, high reward. For long horizons only.",
+    risk: "Very High",
+    color: "#E8352A",
+    holdings: [
+      { symbol: "QQQ", name: "Nasdaq 100 ETF", pct: 35 },
+      { symbol: "TSLA", name: "Tesla", pct: 25 },
+      { symbol: "BTC-USD", name: "Bitcoin", pct: 25 },
+      { symbol: "NVDA", name: "Nvidia", pct: 15 },
+    ],
+  },
+  {
+    id: "stable",
+    name: "Stable & Safe",
+    emoji: "🏦",
+    description: "Capital preservation with steady growth. Ideal for risk-averse investors.",
+    risk: "Low",
+    color: "#0277BD",
+    holdings: [
+      { symbol: "SPY", name: "S&P 500 ETF", pct: 40 },
+      { symbol: "GLD", name: "Gold ETF", pct: 30 },
+      { symbol: "BND", name: "Bond ETF", pct: 30 },
+    ],
+  },
+  {
+    id: "mixed",
+    name: "Balanced Mix",
+    emoji: "🌐",
+    description: "Best of all worlds — stocks, ETFs, gold and crypto in one portfolio.",
+    risk: "Medium",
+    color: "#B87000",
+    holdings: [
+      { symbol: "SPY", name: "S&P 500 ETF", pct: 30 },
+      { symbol: "QQQ", name: "Nasdaq 100 ETF", pct: 25 },
+      { symbol: "GLD", name: "Gold ETF", pct: 20 },
+      { symbol: "BTC-USD", name: "Bitcoin", pct: 15 },
+      { symbol: "BND", name: "Bond ETF", pct: 10 },
+    ],
+  },
+];
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 let _id = 1;
 const makePortfolio = () => {
@@ -1721,6 +1807,9 @@ export default function App() {
   const [softGateOpen, setSoftGateOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [starterModalOpen, setStarterModalOpen] = useState(false);
+  const [starterLoading, setStarterLoading] = useState(false);
+  const [starterLoadingMsg, setStarterLoadingMsg] = useState("");
   const [authModalTab, setAuthModalTab] = useState("signup");
   const [addModal, setAddModal] = useState({ open: false, stock: null });
   const [activePage, setActivePage] = useState(() => localStorage.getItem("wisi_activePage") || "search");
@@ -1885,6 +1974,40 @@ export default function App() {
     setActivePage("search");
     setExploreStock(null);
     setSearchKey((k) => k + 1);
+  };
+
+  const loadStarterPortfolio = async (template) => {
+    setStarterLoading(true);
+    setStarterLoadingMsg("Loading assets...");
+    const totalMonthly = 1000;
+    const results = await Promise.all(
+      template.holdings.map(async (h, i) => {
+        try {
+          const data = await fetchStockInfo(h.symbol, stockCacheRef);
+          const monthly = Math.round((h.pct / 100) * totalMonthly);
+          return {
+            ...data,
+            monthly,
+            rate: data.returns?.base ?? 7,
+            color: CHART_COLORS[i % CHART_COLORS.length],
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+    const validHoldings = results.filter(Boolean);
+    const pf = makePortfolio();
+    pf.name = template.name;
+    pf.holdings = validHoldings;
+    setPortfolios((prev) => [...prev, pf]);
+    setSelectedPf(pf.id);
+    setActivePage("portfolio");
+    setStarterModalOpen(false);
+    setStarterLoading(false);
+    if (!user && !localStorage.getItem("investsim_gate_shown")) {
+      setSoftGateOpen(true);
+    }
   };
 
   // ── Supabase sync ──────────────────────────────────────────────────────────
@@ -2342,6 +2465,7 @@ export default function App() {
                   onOpenDetail={openDetail}
                   overridesMap={overridesMap}
                   saveOverride={saveOverride}
+                  onOpenStarterModal={() => setStarterModalOpen(true)}
                 />
               </>
             )}
@@ -2558,6 +2682,99 @@ export default function App() {
               <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16, fontSize: 11, color: T.textMuted }}>
                 This tool is for educational purposes only. Nothing on this platform constitutes financial advice. Always consult a qualified financial advisor before making investment decisions.
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Starter Portfolios modal */}
+      {starterModalOpen && (
+        <div
+          onClick={(e) => e.target === e.currentTarget && setStarterModalOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div style={{
+            background: T.bg, borderRadius: 6,
+            border: `1px solid ${T.border}`,
+            padding: "28px", width: "100%", maxWidth: 580,
+            maxHeight: "85vh", overflowY: "auto",
+            boxShadow: "0 8px 48px rgba(0,0,0,0.12)",
+            fontFamily: "'Syne', sans-serif",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: T.text, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  Starter Portfolios
+                </div>
+                <div style={{ fontSize: 13, color: T.textSecondary, marginTop: 4 }}>
+                  Choose a template and customize it to your needs.
+                </div>
+              </div>
+              <button onClick={() => setStarterModalOpen(false)}
+                style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+              {STARTER_PORTFOLIOS.map((template) => (
+                <div key={template.id} style={{
+                  border: `1px solid ${T.border}`, borderRadius: 6,
+                  padding: "16px 18px", cursor: "pointer",
+                  transition: "border-color .15s",
+                }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = template.color}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = T.border}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 24 }}>{template.emoji}</span>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: T.text, letterSpacing: "0.04em" }}>
+                          {template.name}
+                        </div>
+                        <div style={{ fontSize: 12, color: T.textSecondary, marginTop: 2 }}>
+                          {template.description}
+                        </div>
+                      </div>
+                    </div>
+                    <RiskBadge risk={template.risk} />
+                  </div>
+
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                    {template.holdings.map((h) => (
+                      <span key={h.symbol} style={{
+                        fontSize: 10, background: T.surface,
+                        border: `1px solid ${T.border}`,
+                        borderRadius: 3, padding: "2px 8px",
+                        fontWeight: 700, color: T.textSecondary,
+                        letterSpacing: "0.06em",
+                      }}>
+                        {h.symbol} {h.pct}%
+                      </span>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => loadStarterPortfolio(template)}
+                    disabled={starterLoading}
+                    style={{
+                      background: template.color, color: "#fff",
+                      border: "none", borderRadius: 3,
+                      padding: "9px 18px",
+                      fontWeight: 700, fontSize: 11, cursor: starterLoading ? "default" : "pointer",
+                      fontFamily: "'Syne', sans-serif",
+                      letterSpacing: "0.08em", textTransform: "uppercase",
+                      opacity: starterLoading ? 0.6 : 1,
+                    }}
+                  >
+                    {starterLoading ? starterLoadingMsg : "Use this template →"}
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
