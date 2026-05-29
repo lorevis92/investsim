@@ -1662,7 +1662,7 @@ function useIsMobile() {
 }
 
 export default function App() {
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const isMobile = useIsMobile();
 
   const [portfolios, setPortfolios] = useState([makePortfolio()]);
@@ -1677,6 +1677,17 @@ export default function App() {
   const [searchKey, setSearchKey] = useState(0);
   const [overridesMap, setOverridesMap] = useState({});
   const [detailStock, setDetailStock] = useState(null);
+  const [splashState, setSplashState] = useState({
+    visible: true, fading: false, message: "Starting up...", progress: 10,
+  });
+
+  const updateSplash = (message, progress) =>
+    setSplashState((prev) => ({ ...prev, message, progress }));
+
+  const hideSplash = () => {
+    setSplashState((prev) => ({ ...prev, fading: true, progress: 100 }));
+    setTimeout(() => setSplashState((prev) => ({ ...prev, visible: false })), 300);
+  };
 
   const openDetail = async (holding) => {
     const stock = {
@@ -1714,6 +1725,36 @@ export default function App() {
   useEffect(() => {
     document.body.style.overflowX = "hidden";
     document.documentElement.style.overflowX = "hidden";
+  }, []);
+
+  // Splash — mount animation
+  useEffect(() => {
+    const t = setTimeout(() => updateSplash("Connecting to database...", 30), 150);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Splash — auth resolved
+  useEffect(() => {
+    if (authLoading) return;
+    updateSplash("Checking your account...", 50);
+    if (user) {
+      updateSplash("Loading your portfolios...", 70);
+    } else {
+      updateSplash("Setting things up...", 70);
+      const t1 = setTimeout(() => {
+        updateSplash("Almost ready...", 90);
+        setTimeout(hideSplash, 300);
+      }, 300);
+      return () => clearTimeout(t1);
+    }
+  }, [authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Splash — safety timeout
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSplashState((prev) => prev.visible ? { ...prev, visible: false, fading: false } : prev);
+    }, 4000);
+    return () => clearTimeout(t);
   }, []);
 
   const loadAllOverrides = async (u) => {
@@ -1835,6 +1876,8 @@ export default function App() {
       // Pre-populate stock cache from all loaded holdings
       portfolioRows.forEach((pf) => populateStockCache(pf.holdings));
     }
+    updateSplash("Almost ready...", 90);
+    setTimeout(hideSplash, 300);
     setTimeout(() => {
       canSaveRef.current = true;
       console.log("[investsim] canSaveRef → true (save unlocked)");
@@ -1842,6 +1885,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     console.log("[investsim] user effect → user:", user?.email ?? null);
     if (user) {
       loadPortfolios(user.id);
@@ -1853,7 +1897,7 @@ export default function App() {
       setSelectedPf(1);
       loadAllOverrides(null);
     }
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     console.log("[investsim] save effect → user:", user?.email ?? null, "| canSave:", canSaveRef.current, "| portfolios:", portfolios.length);
@@ -1933,6 +1977,51 @@ export default function App() {
       fontFamily: "'Syne', system-ui, -apple-system, sans-serif",
       fontSize: 15,
     }}>
+
+      {/* Splash screen */}
+      {splashState.visible && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1000,
+          background: "#FFFFFF",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: 0,
+          opacity: splashState.fading ? 0 : 1,
+          transition: "opacity 0.3s ease",
+          pointerEvents: splashState.fading ? "none" : "auto",
+        }}>
+          <img
+            src="/logo-wisi.png"
+            alt="NVESTING"
+            style={{ width: 120, height: 120, objectFit: "contain", marginBottom: 20 }}
+          />
+          <div style={{
+            fontSize: 15, fontWeight: 800, color: "#E8352A",
+            letterSpacing: "0.14em", textTransform: "uppercase",
+            fontFamily: "'Syne', sans-serif", marginBottom: 32,
+          }}>
+            NVESTING
+          </div>
+          <div style={{ width: 200, marginBottom: 16 }}>
+            <div style={{
+              height: 4, background: "#F0F0F0", borderRadius: 2, overflow: "hidden",
+            }}>
+              <div style={{
+                height: "100%", background: "#E8352A", borderRadius: 2,
+                width: `${splashState.progress}%`,
+                transition: "width 0.4s ease",
+              }} />
+            </div>
+          </div>
+          <div style={{
+            fontSize: 13, color: "#666666",
+            fontFamily: "'Syne', sans-serif",
+            letterSpacing: "0.04em",
+          }}>
+            {splashState.message}
+          </div>
+        </div>
+      )}
 
       {/* Overlay */}
       {sidebarOpen && (
