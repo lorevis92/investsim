@@ -330,6 +330,19 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [monthly, setMonthly] = useState(300);
+  const [searchProgress, setSearchProgress] = useState(0);
+
+  useEffect(() => {
+    if (loading) {
+      setSearchProgress(0);
+      const t = setTimeout(() => setSearchProgress(85), 50);
+      return () => clearTimeout(t);
+    } else {
+      setSearchProgress(100);
+      const t = setTimeout(() => setSearchProgress(0), 400);
+      return () => clearTimeout(t);
+    }
+  }, [loading]);
 
   const effectiveReturns = result ? getReturns(result.symbol, result.returns, overridesMap) : {};
   const symbolOverrides = result ? (overridesMap[result.symbol] ?? null) : null;
@@ -410,6 +423,15 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
           >
             {loading ? "Searching…" : "Search"}
           </button>
+        </div>
+
+        {/* Search progress bar */}
+        <div style={{ height: 3, background: "#F0F0F0", borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
+          <div style={{
+            height: "100%", background: "#E8352A", borderRadius: 2,
+            width: `${searchProgress}%`,
+            transition: searchProgress === 0 ? "none" : loading ? "width 3s ease" : "width 0.3s ease",
+          }} />
         </div>
 
         {!result && (
