@@ -1720,6 +1720,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [softGateOpen, setSoftGateOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState("signup");
   const [addModal, setAddModal] = useState({ open: false, stock: null });
   const [activePage, setActivePage] = useState(() => localStorage.getItem("wisi_activePage") || "search");
@@ -2369,19 +2370,33 @@ export default function App() {
               Part of the <strong>WiSiVERSE</strong> ecosystem
             </span>
           </div>
-          <a
-            href="https://wisiverse.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: 11, color: T.primary, fontWeight: 700,
-              fontFamily: "'Syne', sans-serif",
-              letterSpacing: "0.08em", textTransform: "uppercase",
-              textDecoration: "none",
-            }}
-          >
-            wisiverse.com →
-          </a>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <button
+              onClick={() => setPrivacyOpen(true)}
+              style={{
+                background: "transparent", border: "none",
+                fontSize: 11, color: T.textSecondary, fontWeight: 600,
+                fontFamily: "'Syne', sans-serif",
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                cursor: "pointer", textDecoration: "underline",
+              }}
+            >
+              Privacy Policy
+            </button>
+            <a
+              href="https://wisiverse.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 11, color: T.primary, fontWeight: 700,
+                fontFamily: "'Syne', sans-serif",
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                textDecoration: "none",
+              }}
+            >
+              wisiverse.com →
+            </a>
+          </div>
         </div>
       </footer>
 
@@ -2474,6 +2489,79 @@ export default function App() {
         defaultTab={authModalTab}
         onSuccess={() => localStorage.setItem("investsim_gate_shown", "1")}
       />
+
+      {/* Privacy Policy modal */}
+      {privacyOpen && (
+        <div
+          onClick={(e) => e.target === e.currentTarget && setPrivacyOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div style={{
+            background: T.bg, borderRadius: 6,
+            border: `1px solid ${T.border}`,
+            padding: "32px", width: "100%", maxWidth: 560,
+            maxHeight: "80vh", overflowY: "auto",
+            boxShadow: "0 8px 48px rgba(0,0,0,0.12)",
+            fontFamily: "'Syne', sans-serif",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: T.text, margin: 0, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Privacy Policy
+              </h2>
+              <button onClick={() => setPrivacyOpen(false)}
+                style={{ background: "none", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+
+            <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.8, display: "flex", flexDirection: "column", gap: 16 }}>
+              <p style={{ margin: 0 }}>Last updated: May 2026</p>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 6 }}>Who we are</div>
+                <p style={{ margin: 0 }}>WisiInvesting is a DCA investment simulator developed by WiSiVERSE. This tool is for educational and informational purposes only and does not constitute financial advice.</p>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 6 }}>Data we collect</div>
+                <p style={{ margin: 0 }}>When you create an account, we collect your email address solely for authentication purposes. We store your portfolio data (asset names, monthly amounts) to allow you to access it across sessions. We do not collect names, payment information, or any other personal data.</p>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 6 }}>How we store data</div>
+                <p style={{ margin: 0 }}>Account and portfolio data is stored securely on Supabase (EU servers). Your browser stores session preferences (active page, UI settings) in localStorage and sessionStorage — this data never leaves your device.</p>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 6 }}>Cookies and tracking</div>
+                <p style={{ margin: 0 }}>We do not use advertising cookies or third-party trackers. The only browser storage we use is strictly necessary for authentication and UI preferences. We do not use Google Analytics, Meta Pixel, or any similar services.</p>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 6 }}>Third-party services</div>
+                <p style={{ margin: 0 }}>We use Supabase for database and authentication, Vercel for hosting, and Anthropic Claude API to analyze financial assets. These services have their own privacy policies. Asset price data is fetched from Yahoo Finance.</p>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 6 }}>Your rights</div>
+                <p style={{ margin: 0 }}>You can delete your account and all associated data at any time by contacting us. You can also use WisiInvesting without an account — in this case no personal data is stored on our servers.</p>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 6 }}>Contact</div>
+                <p style={{ margin: 0 }}>For any privacy-related questions, contact us at <a href="mailto:privacy@wisiverse.com" style={{ color: T.primary }}>privacy@wisiverse.com</a></p>
+              </div>
+
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 16, fontSize: 11, color: T.textMuted }}>
+                This tool is for educational purposes only. Nothing on this platform constitutes financial advice. Always consult a qualified financial advisor before making investment decisions.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
