@@ -85,14 +85,16 @@ const getReturns = (symbol, aiReturns, overridesMap) => ({
 // ─── AI FETCH ─────────────────────────────────────────────────────────────────
 const TTL_AI = 90 * 24 * 60 * 60 * 1000;
 
-async function fetchStockInfo(query, cacheRef) {
+async function fetchStockInfo(query, cacheRef, onProgress) {
   console.log("[search] fetchStockInfo called with:", query);
   const key = query.trim().toLowerCase();
 
   // STEP 1: Cerca in memoria React (istantaneo)
+  onProgress?.("Checking memory cache...", 10);
   if (cacheRef?.current?.[key]) {
     console.log("[search] MEMORY HIT for:", key);
     const h = cacheRef.current[key];
+    onProgress?.("Found!", 100);
     return {
       symbol:       h.symbol,
       yahoo_symbol: h.yahoo_symbol,
@@ -110,6 +112,7 @@ async function fetchStockInfo(query, cacheRef) {
   }
 
   // STEP 2: Cerca in Supabase con search_terms (~100ms, nessun cold start)
+  onProgress?.("Searching database...", 30);
   try {
     let sbData = null;
 
@@ -137,6 +140,7 @@ async function fetchStockInfo(query, cacheRef) {
       const aiAge = Date.now() - new Date(sbData.ai_updated_at).getTime();
       if (aiAge < TTL_AI) {
         console.log("[search] SUPABASE HIT for:", sbData.symbol);
+        onProgress?.("Loading data...", 80);
         const result = {
           symbol:       sbData.symbol,
           yahoo_symbol: sbData.yahoo_symbol,
@@ -164,6 +168,7 @@ async function fetchStockInfo(query, cacheRef) {
   }
 
   // STEP 3: Cache miss — chiama backend
+  onProgress?.("Connecting to AI...", 50);
   console.log("[search] BACKEND CALL for:", query);
   const res = await fetch("/api/search", {
     method: "POST",
@@ -171,7 +176,9 @@ async function fetchStockInfo(query, cacheRef) {
     body: JSON.stringify({ query }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
+  onProgress?.("Analyzing asset...", 70);
   const result = await res.json();
+  onProgress?.("Calculating returns...", 90);
   if (cacheRef && result.symbol && result.symbol !== "NOT_FOUND") {
     const keys = [
       query.trim().toLowerCase(),
@@ -330,28 +337,20 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [monthly, setMonthly] = useState(300);
-  const [searchProgress, setSearchProgress] = useState(0);
+  const [searchOverlay, setSearchOverlay] = useState({ visible: false, fading: false, message: "", progress: 0 });
 
-  useEffect(() => {
-    if (loading) {
-      setSearchProgress(0);
-      const t = setTimeout(() => setSearchProgress(85), 50);
-      return () => clearTimeout(t);
-    } else {
-      setSearchProgress(100);
-      const t = setTimeout(() => setSearchProgress(0), 400);
-      return () => clearTimeout(t);
-    }
-  }, [loading]);
+  const onProgress = (message, progress) =>
+    setSearchOverlay((prev) => ({ ...prev, message, progress }));
 
   const effectiveReturns = result ? getReturns(result.symbol, result.returns, overridesMap) : {};
   const symbolOverrides = result ? (overridesMap[result.symbol] ?? null) : null;
 
   const search = async () => {
     if (!query.trim()) return;
+    setSearchOverlay({ visible: true, fading: false, message: "Checking memory cache...", progress: 10 });
     setLoading(true); setResult(null); setError(null);
     try {
-      const data = await fetchStockInfo(query, cacheRef);
+      const data = await fetchStockInfo(query, cacheRef, onProgress);
       if (data.symbol === "NOT_FOUND" || !data.returns?.base) {
         setError("Asset not found. Try a different name — e.g. Apple, S&P 500, Gold.");
       } else {
@@ -360,11 +359,45 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
     } catch {
       setError("Something went wrong. Please try again in a moment.");
     }
+    setSearchOverlay((prev) => ({ ...prev, fading: true, progress: 100 }));
     setLoading(false);
+    setTimeout(() => setSearchOverlay({ visible: false, fading: false, message: "", progress: 0 }), 200);
   };
 
   return (
     <div>
+      {/* Search overlay */}
+      {searchOverlay.visible && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 999, background: "#FFFFFF",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          opacity: searchOverlay.fading ? 0 : 1,
+          transition: "opacity 0.2s ease",
+          pointerEvents: searchOverlay.fading ? "none" : "auto",
+        }}>
+          <img
+            src="/logo-wisi.png"
+            alt="NVESTING"
+            style={{ width: 80, height: 80, objectFit: "contain", marginBottom: 20 }}
+          />
+          <div style={{ width: 200, marginBottom: 16 }}>
+            <div style={{ height: 4, background: "#F0F0F0", borderRadius: 2, overflow: "hidden" }}>
+              <div style={{
+                height: "100%", background: "#E8352A", borderRadius: 2,
+                width: `${searchOverlay.progress}%`,
+                transition: "width 0.5s ease",
+              }} />
+            </div>
+          </div>
+          <div style={{
+            fontSize: 13, color: "#666666",
+            fontFamily: "'Syne', sans-serif", letterSpacing: "0.04em",
+          }}>
+            {searchOverlay.message}
+          </div>
+        </div>
+      )}
+
       {/* Hero */}
       {!result && (
         <div style={{ textAlign: "center", padding: "64px 8px 44px" }}>
@@ -423,15 +456,6 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
           >
             {loading ? "Searching…" : "Search"}
           </button>
-        </div>
-
-        {/* Search progress bar */}
-        <div style={{ height: 3, background: "#F0F0F0", borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
-          <div style={{
-            height: "100%", background: "#E8352A", borderRadius: 2,
-            width: `${searchProgress}%`,
-            transition: searchProgress === 0 ? "none" : loading ? "width 3s ease" : "width 0.3s ease",
-          }} />
         </div>
 
         {!result && (
