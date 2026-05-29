@@ -2348,6 +2348,43 @@ export default function App() {
         )}
       </main>
 
+      {/* Footer WiSiVERSE */}
+      <footer style={{
+        borderTop: `1px solid ${T.border}`,
+        background: T.surface,
+        padding: isMobile ? "16px" : "20px",
+        marginTop: 40,
+      }}>
+        <div style={{
+          maxWidth: 720, margin: "0 auto",
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img src="/logo-wisiverse.png" alt="WiSiVERSE" style={{ height: 32, width: "auto", objectFit: "contain" }} />
+            <span style={{ fontSize: 11, color: T.textSecondary, fontFamily: "'Syne', sans-serif" }}>
+              Part of the <strong>WiSiVERSE</strong> ecosystem
+            </span>
+          </div>
+          <a
+            href="https://wisiverse.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: 11, color: T.primary, fontWeight: 700,
+              fontFamily: "'Syne', sans-serif",
+              letterSpacing: "0.08em", textTransform: "uppercase",
+              textDecoration: "none",
+            }}
+          >
+            wisiverse.com →
+          </a>
+        </div>
+      </footer>
+
       {/* Add-to-portfolio modal */}
       {addModal.open && (
         <AddToPortfolioModal
