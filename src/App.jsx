@@ -339,6 +339,21 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
   const [monthly, setMonthly] = useState(300);
   const [searchOverlay, setSearchOverlay] = useState({ visible: false, fading: false, message: "", progress: 0 });
 
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes carouselScroll {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+      }
+      .carousel-track:hover {
+        animation-play-state: paused !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   const onProgress = (message, progress) =>
     setSearchOverlay((prev) => ({ ...prev, message, progress }));
 
@@ -423,50 +438,6 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
           <p style={{ fontSize: 15, color: T.textSecondary, margin: "0 0 36px", lineHeight: 1.75, maxWidth: 440, marginLeft: "auto", marginRight: "auto" }}>
             Search for a stock, ETF or index — see how much your investment could be worth over time.
           </p>
-
-          {/* Starter templates preview */}
-          <div style={{ marginBottom: 36 }}>
-            <p style={{
-              fontSize: 11, color: T.textMuted, marginBottom: 12,
-              letterSpacing: "0.08em", textTransform: "uppercase",
-              fontFamily: "'Syne', sans-serif",
-            }}>
-              Need inspiration? →
-            </p>
-            <div style={{
-              display: "flex", gap: 8, overflowX: "auto",
-              paddingBottom: 4,
-              scrollbarWidth: "none",
-              msOverflowStyle: "none",
-            }}>
-              {STARTER_PORTFOLIOS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => onOpenStarterModal()}
-                  style={{
-                    flexShrink: 0,
-                    background: T.surface,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 4, padding: "8px 14px",
-                    cursor: "pointer", fontFamily: "'Syne', sans-serif",
-                    display: "flex", alignItems: "center", gap: 7,
-                    transition: "border-color .15s",
-                    whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.borderColor = t.color}
-                  onMouseLeave={(e) => e.currentTarget.style.borderColor = T.border}
-                >
-                  <span style={{ fontSize: 16 }}>{t.emoji}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.05em" }}>{t.name}</span>
-                  <span style={{
-                    fontSize: 9, fontWeight: 700, padding: "1px 6px",
-                    borderRadius: 2, background: T.surfaceAlt,
-                    color: T.textMuted, letterSpacing: "0.06em", textTransform: "uppercase",
-                  }}>{t.risk}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
@@ -511,6 +482,76 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
           </p>
         )}
       </div>
+
+      {/* Templates carousel — sotto la search bar */}
+      {!result && (
+        <div style={{ marginTop: 28, marginBottom: 8 }}>
+          <p style={{
+            textAlign: "center",
+            fontSize: 11, color: T.textMuted,
+            letterSpacing: "0.08em", textTransform: "uppercase",
+            fontFamily: "'Syne', sans-serif",
+            marginBottom: 12,
+          }}>
+            Try our themed portfolios
+          </p>
+
+          {/* Carousel wrapper — overflow hidden */}
+          <div style={{ overflow: "hidden", position: "relative" }}>
+            {/* Inner track — duplica i template per loop infinito */}
+            <div
+              className="carousel-track"
+              style={{
+                display: "flex",
+                gap: 8,
+                width: "max-content",
+                animation: "carouselScroll 20s linear infinite",
+              }}
+            >
+              {[...STARTER_PORTFOLIOS, ...STARTER_PORTFOLIOS].map((t, i) => (
+                <button
+                  key={`${t.id}-${i}`}
+                  onClick={() => onOpenStarterModal()}
+                  style={{
+                    flexShrink: 0,
+                    background: T.surface,
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 4, padding: "10px 16px",
+                    cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                    display: "flex", alignItems: "center", gap: 8,
+                    whiteSpace: "nowrap",
+                    transition: "border-color .15s, background .15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = t.color;
+                    e.currentTarget.style.background = T.surfaceAlt;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = T.border;
+                    e.currentTarget.style.background = T.surface;
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>{t.emoji}</span>
+                  <div style={{ textAlign: "left" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: "0.05em" }}>
+                      {t.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: T.textMuted, marginTop: 1 }}>
+                      {t.holdings.map((h) => h.symbol).join(" · ")}
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: "2px 6px",
+                    borderRadius: 2, background: T.surfaceAlt,
+                    color: T.textMuted, letterSpacing: "0.06em",
+                    textTransform: "uppercase", marginLeft: 4,
+                  }}>{t.risk}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
