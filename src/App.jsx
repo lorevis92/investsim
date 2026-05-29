@@ -375,11 +375,14 @@ function SearchPanel({ onAdd, onExplore, overridesMap, saveOverride, resetOverri
           transition: "opacity 0.2s ease",
           pointerEvents: searchOverlay.fading ? "none" : "auto",
         }}>
-          <img
-            src="/logo-wisi.png"
-            alt="NVESTING"
-            style={{ width: 80, height: 80, objectFit: "contain", marginBottom: 20 }}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 24 }}>
+            <img src="/logo-wisi.png" alt="WisiInvesting" style={{ height: 60, width: "auto", objectFit: "contain" }} />
+            <span style={{
+              fontSize: 22, fontWeight: 800, color: "#E8352A",
+              textTransform: "uppercase", letterSpacing: "0.10em",
+              fontFamily: "'Syne', sans-serif",
+            }}>NVESTING</span>
+          </div>
           <div style={{ width: 200, marginBottom: 16 }}>
             <div style={{ height: 4, background: "#F0F0F0", borderRadius: 2, overflow: "hidden" }}>
               <div style={{
