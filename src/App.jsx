@@ -376,6 +376,7 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
         setError("Asset not found. Try a different name — e.g. Apple, S&P 500, Gold.");
       } else {
         setResult(data);
+        onExplore({ ...data, returns: getReturns(data.symbol, data.returns, overridesMap) });
       }
     } catch {
       setError("Something went wrong. Please try again in a moment.");
@@ -721,17 +722,6 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
               }}
             >
               Add to portfolio
-            </button>
-            <button
-              onClick={() => onExplore({ ...result, returns: effectiveReturns })}
-              style={{
-                flex: 1, minWidth: 140, background: "transparent", color: T.primary,
-                border: `1.5px solid ${T.primary}`, borderRadius: 3, padding: "14px 16px",
-                fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "'Syne', sans-serif",
-                letterSpacing: "0.09em", textTransform: "uppercase",
-              }}
-            >
-              View simulation
             </button>
           </div>
         </div>
