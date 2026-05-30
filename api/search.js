@@ -236,10 +236,10 @@ Assign a confidence level to your estimate:
   LOW        → <8 years, major distortions, highly speculative,
                or structurally novel asset with no real precedent
 
-Also list all flags triggered from Section 2:
-  INSUFFICIENT_HISTORY | LIMITED_HISTORY | DISCOVERY_PHASE_EXCLUDED |
-  MATURITY_ADJUSTMENT | SPIKE_CORRECTION | CYCLICAL_ASSET |
-  MEAN_REVERSION_APPLIED | VALUATION_DRAG_APPLIED
+Also list all applicable flags inside the explanation object.
+Available flags (use only these):
+  SPIKE_CORRECTION | LIMITED_HISTORY | HIGH_VOLATILITY | REGULATORY_RISK |
+  CYCLE_PEAK | CYCLE_BOTTOM | SPECULATIVE | ESTABLISHED_ASSET | RECENT_CORRECTION
 
 ═══════════════════════════════════════════════════════════
 SECTION 5 — USER-FACING EXPLANATION
@@ -285,8 +285,6 @@ no preamble. Exactly this structure:
     "base": 12.0,
     "optimistic": 20.0
   },
-  "confidence": "HIGH | MEDIUM | LOW",
-  "flags": ["FLAG_1", "FLAG_2"],
   "adjustments": {
     "historyYearsUsed": 12,
     "historyYearsExcluded": 3,
@@ -296,7 +294,15 @@ no preamble. Exactly this structure:
     "cyclePosition": "PEAK | MID | BOTTOM | N/A",
     "valuationVsHistorical": "ELEVATED | NORMAL | DEPRESSED | N/A"
   },
-  "explanation": "Plain language explanation for the user (3-5 sentences)",
+  "explanation": {
+    "text": "Plain language summary for the user (2-3 sentences max). No jargon, no CAGR — use plain language. Match the language of the user query.",
+    "historical": "What the historical data shows: actual return numbers, how many years of data used, which periods were excluded and why. Be specific with numbers.",
+    "currentContext": "Current market situation: where is this asset in its cycle, recent price action relative to history, current valuation vs historical average, any recent spike or crash. Be specific — e.g. 'BTC is near all-time highs after a 150% rally in 12 months, suggesting cycle peak; post-peak corrections of 70-80% have historically occurred'.",
+    "riskFactors": "Main risks specific to this asset: concentration risk, regulatory risk, cycle risk, liquidity risk, competitive threats, etc. Name the actual risks, not generic disclaimers.",
+    "methodology": "Exactly how the pessimistic/base/optimistic numbers were derived: which benchmark ranges were used, what adjustments were applied (spike correction, phase exclusion, valuation drag), and why each number landed where it did.",
+    "confidence": "HIGH | MEDIUM | LOW",
+    "flags": ["SPIKE_CORRECTION | LIMITED_HISTORY | HIGH_VOLATILITY | REGULATORY_RISK | CYCLE_PEAK | CYCLE_BOTTOM | SPECULATIVE | ESTABLISHED_ASSET | RECENT_CORRECTION — pick all that apply"]
+  },
   "disclaimer": "Estimates are based on historical analysis and forward-looking assumptions. They do not guarantee future results and do not constitute financial advice."
 }
 
@@ -519,12 +525,16 @@ export default async function handler(request) {
       risk:               aiResult.risk,
       sector:             aiResult.sector,
       description:        aiResult.description ?? null,
-      // explanation stores: text + confidence + flags + adjustments
+      // explanation stores all structured fields from the new prompt format
       explanation: {
-        text:        aiResult.explanation ?? null,
-        confidence:  aiResult.confidence  ?? null,
-        flags:       aiResult.flags       ?? [],
-        adjustments: aiResult.adjustments ?? {},
+        text:           aiResult.explanation?.text           ?? aiResult.explanation ?? null,
+        historical:     aiResult.explanation?.historical     ?? null,
+        currentContext: aiResult.explanation?.currentContext ?? null,
+        riskFactors:    aiResult.explanation?.riskFactors    ?? null,
+        methodology:    aiResult.explanation?.methodology    ?? null,
+        confidence:     aiResult.confidence  ?? aiResult.explanation?.confidence ?? null,
+        flags:          aiResult.flags       ?? aiResult.explanation?.flags       ?? [],
+        adjustments:    aiResult.adjustments ?? {},
       },
       return_pessimistic: aiReturns.pessimistic ?? fallback.pessimistic,
       return_base:        aiReturns.base        ?? fallback.base,
