@@ -307,12 +307,12 @@ function ExplanationSection({ explanation }) {
   const flags      = Array.isArray(explanation?.flags) ? explanation.flags : [];
 
   // Old format: { historical, currentContext, riskFactors, methodology }
-  const oldItems = newText == null ? [
+  const oldItems = [
     { icon: "📈", label: "HISTORICAL DATA",  text: explanation?.historical },
     { icon: "🔍", label: "CURRENT CONTEXT",  text: explanation?.currentContext },
     { icon: "⚠️", label: "RISK FACTORS",     text: explanation?.riskFactors },
     { icon: "🧮", label: "METHODOLOGY",      text: explanation?.methodology },
-  ].filter((item) => item.text) : [];
+  ].filter((item) => item.text);
 
   if (!newText && oldItems.length === 0) return null;
 
@@ -338,9 +338,9 @@ function ExplanationSection({ explanation }) {
 
       {open && (
         <div style={{ paddingBottom: 16 }}>
-          {newText ? (
-            // ── New format ──
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* New format: plain text + confidence badge + flags */}
+          {newText && (
+            <div style={{ marginBottom: oldItems.length > 0 ? 12 : 0 }}>
               <div style={{
                 background: T.surface, borderRadius: 4, padding: "14px 16px",
                 border: `1px solid ${T.border}`,
@@ -349,7 +349,7 @@ function ExplanationSection({ explanation }) {
                 {newText}
               </div>
               {(confStyle || flags.length > 0) && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginTop: 8 }}>
                   {confStyle && (
                     <span style={{
                       fontSize: 9, fontWeight: 700, padding: "3px 8px",
@@ -375,9 +375,11 @@ function ExplanationSection({ explanation }) {
                 </div>
               )}
             </div>
-          ) : (
-            // ── Old structured format ──
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          )}
+
+          {/* Old structured format: historical, currentContext, riskFactors, methodology */}
+          {oldItems.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: newText ? 8 : 0 }}>
               {oldItems.map(({ icon, label, text }) => (
                 <div key={label} style={{
                   background: T.surface, borderRadius: 4, padding: "12px 14px",
@@ -452,14 +454,13 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
   const handleRefresh = async () => {
     if (!result || refreshing) return;
     setRefreshing(true);
+    setSearchOverlay({ visible: true, fading: false, message: "Forcing refresh...", progress: 20 });
     try {
-      const data = await fetchStockInfo(query, cacheRef, undefined, true);
-      if (data?.symbol !== "NOT_FOUND" && data?.returns?.base) {
-        setResult(data);
-      }
-    } catch {
-      // silent
-    }
+      const data = await fetchStockInfo(query, cacheRef, onProgress, true);
+      if (data?.symbol !== "NOT_FOUND" && data?.returns?.base) setResult(data);
+    } catch {}
+    setSearchOverlay((prev) => ({ ...prev, fading: true, progress: 100 }));
+    setTimeout(() => setSearchOverlay({ visible: false, fading: false, message: "", progress: 0 }), 200);
     setRefreshing(false);
   };
 
@@ -2014,8 +2015,7 @@ export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [starterModalOpen, setStarterModalOpen] = useState(false);
-  const [starterLoading, setStarterLoading] = useState(false);
-  const [starterLoadingMsg, setStarterLoadingMsg] = useState("");
+  const [starterLoadingId, setStarterLoadingId] = useState(null);
   const [authModalTab, setAuthModalTab] = useState("signup");
   const [addModal, setAddModal] = useState({ open: false, stock: null });
   const [activePage, setActivePage] = useState(() => localStorage.getItem("wisi_activePage") || "search");
@@ -2025,6 +2025,7 @@ export default function App() {
   const [splashState, setSplashState] = useState({
     visible: true, fading: false, message: "Starting up...", progress: 10,
   });
+  const [globalOverlay, setGlobalOverlay] = useState({ visible: false, fading: false, message: "", progress: 0 });
 
   const updateSplash = (message, progress) =>
     setSplashState((prev) => ({ ...prev, message, progress }));
@@ -2032,6 +2033,14 @@ export default function App() {
   const hideSplash = () => {
     setSplashState((prev) => ({ ...prev, fading: true, progress: 100 }));
     setTimeout(() => setSplashState((prev) => ({ ...prev, visible: false })), 300);
+  };
+
+  const showGlobalOverlay = (message, progress) =>
+    setGlobalOverlay({ visible: true, fading: false, message, progress });
+
+  const hideGlobalOverlay = () => {
+    setGlobalOverlay((prev) => ({ ...prev, fading: true, progress: 100 }));
+    setTimeout(() => setGlobalOverlay({ visible: false, fading: false, message: "", progress: 0 }), 200);
   };
 
   const openDetail = async (holding) => {
@@ -2183,8 +2192,8 @@ export default function App() {
   };
 
   const loadStarterPortfolio = async (template) => {
-    setStarterLoading(true);
-    setStarterLoadingMsg("Loading assets...");
+    setStarterLoadingId(template.id);
+    showGlobalOverlay("Loading template...", 10);
     const totalMonthly = 1000;
     const results = await Promise.all(
       template.holdings.map(async (h, i) => {
@@ -2202,6 +2211,7 @@ export default function App() {
         }
       })
     );
+    showGlobalOverlay("Building portfolio...", 80);
     const validHoldings = results.filter(Boolean);
     const pf = makePortfolio();
     pf.name = template.name;
@@ -2210,7 +2220,8 @@ export default function App() {
     setSelectedPf(pf.id);
     setActivePage("portfolio");
     setStarterModalOpen(false);
-    setStarterLoading(false);
+    setStarterLoadingId(null);
+    hideGlobalOverlay();
     if (!user && !localStorage.getItem("investsim_gate_shown")) {
       setSoftGateOpen(true);
     }
@@ -2624,8 +2635,10 @@ export default function App() {
                   saveOverride={saveOverride}
                   resetOverride={resetOverride}
                   onRefresh={async () => {
+                    showGlobalOverlay("Forcing refresh...", 20);
                     const data = await fetchStockInfo(exploreStock.symbol, stockCacheRef, undefined, true);
                     if (data?.returns?.base) setExploreStock(prev => ({ ...prev, ...data }));
+                    hideGlobalOverlay();
                   }}
                 />
               </div>
@@ -2655,8 +2668,10 @@ export default function App() {
                   saveOverride={saveOverride}
                   resetOverride={resetOverride}
                   onRefresh={async () => {
+                    showGlobalOverlay("Forcing refresh...", 20);
                     const data = await fetchStockInfo(detailStock.symbol, stockCacheRef, undefined, true);
                     if (data?.returns?.base) setDetailStock(prev => ({ ...prev, ...data }));
+                    hideGlobalOverlay();
                   }}
                 />
               </>
@@ -2915,6 +2930,30 @@ export default function App() {
       )}
 
       {/* Starter Portfolios modal */}
+      {/* Global loading overlay (starter portfolios, ExplorePanel refresh) */}
+      {globalOverlay.visible && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 998, background: "#FFFFFF",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          opacity: globalOverlay.fading ? 0 : 1,
+          transition: "opacity 0.2s ease",
+          pointerEvents: globalOverlay.fading ? "none" : "auto",
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 24 }}>
+            <img src="/logo-wisi.png" alt="WisiInvesting" style={{ height: 60, width: "auto", objectFit: "contain" }} />
+            <span style={{ fontSize: 22, fontWeight: 800, color: "#E8352A", textTransform: "uppercase", letterSpacing: "0.10em", fontFamily: "'Syne', sans-serif" }}>NVESTING</span>
+          </div>
+          <div style={{ width: 200, marginBottom: 16 }}>
+            <div style={{ height: 4, background: "#F0F0F0", borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ height: "100%", background: "#E8352A", borderRadius: 2, width: `${globalOverlay.progress}%`, transition: "width 0.5s ease" }} />
+            </div>
+          </div>
+          <div style={{ fontSize: 13, color: "#666666", fontFamily: "'Syne', sans-serif", letterSpacing: "0.04em" }}>
+            {globalOverlay.message}
+          </div>
+        </div>
+      )}
+
       {starterModalOpen && (
         <div
           onClick={(e) => e.target === e.currentTarget && setStarterModalOpen(false)}
@@ -2987,18 +3026,18 @@ export default function App() {
 
                   <button
                     onClick={() => loadStarterPortfolio(template)}
-                    disabled={starterLoading}
+                    disabled={starterLoadingId !== null}
                     style={{
                       background: template.color, color: "#fff",
                       border: "none", borderRadius: 3,
                       padding: "9px 18px",
-                      fontWeight: 700, fontSize: 11, cursor: starterLoading ? "default" : "pointer",
+                      fontWeight: 700, fontSize: 11, cursor: starterLoadingId !== null ? "default" : "pointer",
                       fontFamily: "'Syne', sans-serif",
                       letterSpacing: "0.08em", textTransform: "uppercase",
-                      opacity: starterLoading ? 0.6 : 1,
+                      opacity: starterLoadingId === template.id ? 0.6 : 1,
                     }}
                   >
-                    {starterLoading ? starterLoadingMsg : "Use this template →"}
+                    {starterLoadingId === template.id ? "Loading..." : "Use this template →"}
                   </button>
                 </div>
               ))}
