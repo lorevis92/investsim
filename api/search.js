@@ -33,7 +33,7 @@ const RETURN_BENCHMARKS = {
   speculative:        { pessimistic: -2,  base: 11,  optimistic: 23 },
 };
 
-const TTL_AI    = 90 * 24 * 60 * 60 * 1000; // 90 days
+const TTL_AI    = 30 * 24 * 60 * 60 * 1000; // 30 days
 const TTL_PRICE = 15 * 60 * 1000;            // 15 minutes
 
 const SYSTEM_PROMPT = `You are a professional financial analyst assistant embedded in an investment
@@ -364,9 +364,9 @@ export default async function handler(request) {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
-  let query;
+  let query, refresh;
   try {
-    ({ query } = await request.json());
+    ({ query, refresh } = await request.json());
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
       status: 400,
@@ -380,6 +380,8 @@ export default async function handler(request) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  const forceRefresh = refresh === true || refresh === 'true';
 
   const supabase = getSupabase();
   const now = Date.now();
@@ -423,9 +425,9 @@ export default async function handler(request) {
   // Working row — merged in-memory as each layer resolves
   let row = cached ? { ...cached } : {};
 
-  // ── Layer 1: AI data (TTL 90 days) ──────────────────────────────────────────
+  // ── Layer 1: AI data (TTL 30 days) ──────────────────────────────────────────
   const aiAge   = cached?.ai_updated_at ? now - new Date(cached.ai_updated_at).getTime() : Infinity;
-  const aiStale = aiAge > TTL_AI;
+  const aiStale = forceRefresh || aiAge > TTL_AI;
 
   if (!aiStale) {
     console.log(`[search] AI cache HIT: ${row.symbol} (age ${Math.round(aiAge / 86400000)}d)`);

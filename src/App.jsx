@@ -83,97 +83,108 @@ const getReturns = (symbol, aiReturns, overridesMap) => ({
 });
 
 // ─── AI FETCH ─────────────────────────────────────────────────────────────────
-const TTL_AI = 90 * 24 * 60 * 60 * 1000;
+const TTL_AI = 30 * 24 * 60 * 60 * 1000;
 
-async function fetchStockInfo(query, cacheRef, onProgress) {
-  console.log("[search] fetchStockInfo called with:", query);
+async function fetchStockInfo(query, cacheRef, onProgress, force = false) {
+  console.log("[search] fetchStockInfo called with:", query, force ? "(FORCE)" : "");
   const key = query.trim().toLowerCase();
 
-  // STEP 1: Cerca in memoria React (istantaneo)
-  onProgress?.("Checking memory cache...", 10);
-  if (cacheRef?.current?.[key]) {
-    console.log("[search] MEMORY HIT for:", key);
-    const h = cacheRef.current[key];
-    onProgress?.("Found!", 100);
-    return {
-      symbol:       h.symbol,
-      yahoo_symbol: h.yahoo_symbol,
-      name:         h.name,
-      type:         h.type,
-      category:     h.category,
-      currentPrice: h.currentPrice ?? h.current_price,
-      currency:     h.currency,
-      description:  h.description,
-      risk:         h.risk,
-      sector:       h.sector,
-      explanation:  h.explanation,
-      returns:      h.returns ?? { pessimistic: h.rate, base: h.rate, optimistic: h.rate },
-    };
+  // STEP 1: Cerca in memoria React (istantaneo) — saltato se force
+  if (!force) {
+    onProgress?.("Checking memory cache...", 10);
+    if (cacheRef?.current?.[key]) {
+      console.log("[search] MEMORY HIT for:", key);
+      const h = cacheRef.current[key];
+      onProgress?.("Found!", 100);
+      return {
+        symbol:       h.symbol,
+        yahoo_symbol: h.yahoo_symbol,
+        name:         h.name,
+        type:         h.type,
+        category:     h.category,
+        currentPrice: h.currentPrice ?? h.current_price,
+        currency:     h.currency,
+        description:  h.description,
+        risk:         h.risk,
+        sector:       h.sector,
+        explanation:  h.explanation,
+        returns:      h.returns ?? { pessimistic: h.rate, base: h.rate, optimistic: h.rate },
+      };
+    }
   }
 
-  // STEP 2: Cerca in Supabase con search_terms (~100ms, nessun cold start)
-  onProgress?.("Searching database...", 30);
-  try {
-    let sbData = null;
+  // STEP 2: Cerca in Supabase con search_terms (~100ms, nessun cold start) — saltato se force
+  if (!force) {
+    onProgress?.("Searching database...", 30);
+    try {
+      let sbData = null;
 
-    const { data: d1 } = await supabase
-      .from("stocks")
-      .select("*")
-      .contains("search_terms", [key])
-      .not("ai_updated_at", "is", null)
-      .limit(1)
-      .maybeSingle();
-    sbData = d1 ?? null;
-
-    if (!sbData) {
-      const { data: d2 } = await supabase
+      const { data: d1 } = await supabase
         .from("stocks")
         .select("*")
-        .ilike("symbol", `${query.trim()}%`)
+        .contains("search_terms", [key])
         .not("ai_updated_at", "is", null)
         .limit(1)
         .maybeSingle();
-      sbData = d2 ?? null;
-    }
+      sbData = d1 ?? null;
 
-    if (sbData?.ai_updated_at && sbData?.name && sbData?.description) {
-      const aiAge = Date.now() - new Date(sbData.ai_updated_at).getTime();
-      if (aiAge < TTL_AI) {
-        console.log("[search] SUPABASE HIT for:", sbData.symbol);
-        onProgress?.("Loading data...", 80);
-        const result = {
-          symbol:       sbData.symbol,
-          yahoo_symbol: sbData.yahoo_symbol,
-          name:         sbData.name,
-          type:         sbData.type,
-          category:     sbData.category,
-          currentPrice: sbData.current_price,
-          currency:     sbData.currency,
-          description:  sbData.description,
-          risk:         sbData.risk,
-          sector:       sbData.sector,
-          explanation:  sbData.explanation,
-          returns: {
-            pessimistic: sbData.return_pessimistic,
-            base:        sbData.return_base,
-            optimistic:  sbData.return_optimistic,
-          },
-        };
-        if (cacheRef) cacheRef.current[key] = result;
-        return result;
+      if (!sbData) {
+        const { data: d2 } = await supabase
+          .from("stocks")
+          .select("*")
+          .ilike("symbol", `${query.trim()}%`)
+          .not("ai_updated_at", "is", null)
+          .limit(1)
+          .maybeSingle();
+        sbData = d2 ?? null;
       }
+
+      if (sbData?.ai_updated_at && sbData?.name) {
+        const aiAge = Date.now() - new Date(sbData.ai_updated_at).getTime();
+        if (aiAge < TTL_AI) {
+          console.log("[search] SUPABASE HIT for:", sbData.symbol);
+          onProgress?.("Loading data...", 80);
+          const result = {
+            symbol:       sbData.symbol,
+            yahoo_symbol: sbData.yahoo_symbol,
+            name:         sbData.name,
+            type:         sbData.type,
+            category:     sbData.category,
+            currentPrice: sbData.current_price,
+            currency:     sbData.currency,
+            description:  sbData.description,
+            risk:         sbData.risk,
+            sector:       sbData.sector,
+            explanation:  sbData.explanation,
+            returns: {
+              pessimistic: sbData.return_pessimistic,
+              base:        sbData.return_base,
+              optimistic:  sbData.return_optimistic,
+            },
+          };
+          if (cacheRef) cacheRef.current[key] = result;
+          return result;
+        } else {
+          console.log(`[search] SUPABASE STALE for ${sbData.symbol} (age ${Math.round(aiAge / 86400000)}d) — calling AI`);
+        }
+      }
+    } catch (e) {
+      console.log("[search] Supabase error:", e.message);
     }
-  } catch (e) {
-    console.log("[search] Supabase error:", e.message);
+  } else {
+    onProgress?.("Forcing refresh...", 20);
+    console.log("[search] FORCE REFRESH — skipping all cache for:", key);
+    // Pulisce anche la memoria React per questo key
+    if (cacheRef?.current?.[key]) delete cacheRef.current[key];
   }
 
-  // STEP 3: Cache miss — chiama backend
+  // STEP 3: Cache miss o force — chiama backend
   onProgress?.("Connecting to AI...", 50);
   console.log("[search] BACKEND CALL for:", query);
   const res = await fetch("/api/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({ query, refresh: force }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
   onProgress?.("Analyzing asset...", 70);
@@ -392,6 +403,7 @@ function ExplanationSection({ explanation }) {
 function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveOverride, resetOverride, cacheRef }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [monthly, setMonthly] = useState(300);
@@ -435,6 +447,20 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
     setSearchOverlay((prev) => ({ ...prev, fading: true, progress: 100 }));
     setLoading(false);
     setTimeout(() => setSearchOverlay({ visible: false, fading: false, message: "", progress: 0 }), 200);
+  };
+
+  const handleRefresh = async () => {
+    if (!result || refreshing) return;
+    setRefreshing(true);
+    try {
+      const data = await fetchStockInfo(query, cacheRef, undefined, true);
+      if (data?.symbol !== "NOT_FOUND" && data?.returns?.base) {
+        setResult(data);
+      }
+    } catch {
+      // silent
+    }
+    setRefreshing(false);
   };
 
   return (
@@ -642,6 +668,19 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
                 <Badge>{result.type}</Badge>
                 <RiskBadge risk={result.risk} />
               </div>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                style={{
+                  marginTop: 10, background: "none", border: "none", padding: 0,
+                  color: refreshing ? T.textMuted : T.textSecondary,
+                  fontSize: 10, cursor: refreshing ? "default" : "pointer",
+                  fontFamily: "'Syne', sans-serif", letterSpacing: "0.06em",
+                  opacity: refreshing ? 0.6 : 0.75,
+                }}
+              >
+                {refreshing ? "↻ Updating..." : "↻ Refresh analysis"}
+              </button>
             </div>
             {result.currentPrice && (
               <div style={{ textAlign: "right" }}>
@@ -1153,8 +1192,9 @@ function fmtPrice(v) {
   return v.toLocaleString("en-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverride }) {
+function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverride, onRefresh }) {
   const [monthly, setMonthly] = useState(500);
+  const [refreshing, setRefreshing] = useState(false);
   const aiReturns = stock.returns ?? { pessimistic: stock.rate, base: stock.rate, optimistic: stock.rate };
   const price = stock.currentPrice;
   const currency = stock.currency ?? "";
@@ -1162,6 +1202,12 @@ function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverrid
   const returns = getReturns(stock.symbol, aiReturns, overridesMap);
   const symbolOverrides = overridesMap[stock.symbol] ?? null;
   const hasOverrides = symbolOverrides != null && Object.keys(symbolOverrides).length > 0;
+
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try { await onRefresh(); } finally { setRefreshing(false); }
+  };
 
   const data = Array.from({ length: 31 }, (_, y) => ({
     year: y,
@@ -1178,9 +1224,26 @@ function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverrid
     }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: T.text, letterSpacing: "0.07em", fontFamily: "Georgia, 'Times New Roman', serif" }}>
-          {stock.symbol}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: T.text, letterSpacing: "0.07em", fontFamily: "Georgia, 'Times New Roman', serif" }}>
+            {stock.symbol}
+          </span>
+          {onRefresh && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              style={{
+                background: "none", border: "none", padding: 0,
+                color: refreshing ? T.textMuted : T.textSecondary,
+                fontSize: 10, cursor: refreshing ? "default" : "pointer",
+                fontFamily: "'Syne', sans-serif", letterSpacing: "0.06em",
+                opacity: refreshing ? 0.6 : 0.75,
+              }}
+            >
+              {refreshing ? "↻ Updating..." : "↻ Refresh"}
+            </button>
+          )}
+        </div>
         <button
           onClick={onClose}
           style={{ background: "transparent", border: "none", color: T.textMuted, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 4 }}
@@ -2560,6 +2623,10 @@ export default function App() {
                   overridesMap={overridesMap}
                   saveOverride={saveOverride}
                   resetOverride={resetOverride}
+                  onRefresh={async () => {
+                    const data = await fetchStockInfo(exploreStock.symbol, stockCacheRef, undefined, true);
+                    if (data?.returns?.base) setExploreStock(prev => ({ ...prev, ...data }));
+                  }}
                 />
               </div>
             )}
@@ -2587,6 +2654,10 @@ export default function App() {
                   overridesMap={overridesMap}
                   saveOverride={saveOverride}
                   resetOverride={resetOverride}
+                  onRefresh={async () => {
+                    const data = await fetchStockInfo(detailStock.symbol, stockCacheRef, undefined, true);
+                    if (data?.returns?.base) setDetailStock(prev => ({ ...prev, ...data }));
+                  }}
                 />
               </>
             ) : (
