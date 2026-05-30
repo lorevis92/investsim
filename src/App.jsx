@@ -280,16 +280,32 @@ function EditableReturn({ value, color, onSave, isCustom = false, fontSize = 26,
 }
 
 // ─── EXPLANATION SECTION ──────────────────────────────────────────────────────
+const CONF_STYLE = {
+  HIGH:   { bg: "rgba(0,153,106,0.07)",  text: "#00996A", border: "rgba(0,153,106,0.20)"  },
+  MEDIUM: { bg: "rgba(184,112,0,0.07)",  text: "#B87000", border: "rgba(184,112,0,0.20)"  },
+  LOW:    { bg: "rgba(232,53,42,0.07)",  text: "#E8352A", border: "rgba(232,53,42,0.20)"  },
+};
+
 function ExplanationSection({ explanation }) {
   const [open, setOpen] = useState(false);
   if (!explanation) return null;
 
-  const items = [
-    { icon: "📈", label: "HISTORICAL DATA",  text: explanation.historical },
-    { icon: "🔍", label: "CURRENT CONTEXT",  text: explanation.currentContext },
-    { icon: "⚠️", label: "RISK FACTORS",     text: explanation.riskFactors },
-    { icon: "🧮", label: "METHODOLOGY",      text: explanation.methodology },
-  ];
+  // New format: { text, confidence, flags, adjustments }
+  const newText    = typeof explanation === "string" ? explanation : (explanation?.text ?? null);
+  const confidence = explanation?.confidence ?? null;
+  const flags      = Array.isArray(explanation?.flags) ? explanation.flags : [];
+
+  // Old format: { historical, currentContext, riskFactors, methodology }
+  const oldItems = newText == null ? [
+    { icon: "📈", label: "HISTORICAL DATA",  text: explanation?.historical },
+    { icon: "🔍", label: "CURRENT CONTEXT",  text: explanation?.currentContext },
+    { icon: "⚠️", label: "RISK FACTORS",     text: explanation?.riskFactors },
+    { icon: "🧮", label: "METHODOLOGY",      text: explanation?.methodology },
+  ].filter((item) => item.text) : [];
+
+  if (!newText && oldItems.length === 0) return null;
+
+  const confStyle = confidence ? (CONF_STYLE[confidence] ?? CONF_STYLE.MEDIUM) : null;
 
   return (
     <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 20 }}>
@@ -310,20 +326,62 @@ function ExplanationSection({ explanation }) {
       </button>
 
       {open && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 16 }}>
-          {items.map(({ icon, label, text }) => (
-            <div key={label} style={{
-              background: T.surface, borderRadius: 4, padding: "12px 14px",
-              border: `1px solid ${T.border}`,
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: T.textSecondary, marginBottom: 6, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
-                {icon} {label}
+        <div style={{ paddingBottom: 16 }}>
+          {newText ? (
+            // ── New format ──
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{
+                background: T.surface, borderRadius: 4, padding: "14px 16px",
+                border: `1px solid ${T.border}`,
+                fontSize: 13, color: T.textSecondary, lineHeight: 1.8,
+              }}>
+                {newText}
               </div>
-              <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.75 }}>
-                {text}
-              </div>
+              {(confStyle || flags.length > 0) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  {confStyle && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: "3px 8px",
+                      borderRadius: 2, background: confStyle.bg,
+                      color: confStyle.text, border: `1px solid ${confStyle.border}`,
+                      letterSpacing: "0.08em", textTransform: "uppercase",
+                      fontFamily: "'Syne', sans-serif",
+                    }}>
+                      {confidence} CONFIDENCE
+                    </span>
+                  )}
+                  {flags.map((flag) => (
+                    <span key={flag} style={{
+                      fontSize: 9, fontWeight: 600, padding: "3px 8px",
+                      borderRadius: 2, background: T.surfaceAlt,
+                      color: T.textMuted, border: `1px solid ${T.border}`,
+                      letterSpacing: "0.06em", textTransform: "uppercase",
+                      fontFamily: "'Syne', sans-serif",
+                    }}>
+                      {flag.replace(/_/g, " ")}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
+          ) : (
+            // ── Old structured format ──
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {oldItems.map(({ icon, label, text }) => (
+                <div key={label} style={{
+                  background: T.surface, borderRadius: 4, padding: "12px 14px",
+                  border: `1px solid ${T.border}`,
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: T.textSecondary, marginBottom: 6, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
+                    {icon} {label}
+                  </div>
+                  <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.75 }}>
+                    {text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
