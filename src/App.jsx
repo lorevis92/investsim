@@ -298,7 +298,6 @@ const CONF_STYLE = {
 };
 
 function ExplanationSection({ explanation }) {
-  const [open, setOpen] = useState(false);
   if (!explanation) return null;
 
   const newText = typeof explanation === "string" ? explanation : (explanation?.text ?? null);
@@ -313,53 +312,25 @@ function ExplanationSection({ explanation }) {
   if (!newText && structuredItems.length === 0) return null;
 
   return (
-    <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 20 }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          width: "100%", background: "none", border: "none", cursor: "pointer",
-          padding: "14px 0", display: "flex", justifyContent: "space-between",
-          alignItems: "center", fontFamily: "'Syne', sans-serif",
-        }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 700, color: T.textSecondary, letterSpacing: "0.10em", textTransform: "uppercase" }}>
-          How we calculated this
-        </span>
-        <span style={{ color: T.textMuted, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em" }}>
-          {open ? "CLOSE ▲" : "SHOW ▼"}
-        </span>
-      </button>
-
-      {open && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 16 }}>
-          {newText && (
-            <div style={{
-              background: T.surface, borderRadius: 4, padding: "14px 16px",
-              border: `1px solid ${T.border}`,
-              fontSize: 13, color: T.textSecondary, lineHeight: 1.8,
-            }}>
-              {newText}
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: T.textSecondary, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif", marginBottom: 10 }}>
+        About this estimate
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {newText && (
+          <div style={{ background: T.surface, borderRadius: 4, padding: "14px 16px", border: `1px solid ${T.border}`, fontSize: 13, color: T.textSecondary, lineHeight: 1.8 }}>
+            {newText}
+          </div>
+        )}
+        {structuredItems.map(({ icon, label, text }) => (
+          <div key={label} style={{ background: T.surface, borderRadius: 4, padding: "12px 14px", border: `1px solid ${T.border}` }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.textSecondary, marginBottom: 6, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "'Syne', sans-serif" }}>
+              {icon} {label}
             </div>
-          )}
-          {structuredItems.map(({ icon, label, text }) => (
-            <div key={label} style={{
-              background: T.surface, borderRadius: 4, padding: "12px 14px",
-              border: `1px solid ${T.border}`,
-            }}>
-              <div style={{
-                fontSize: 10, fontWeight: 700, color: T.textSecondary,
-                marginBottom: 6, letterSpacing: "0.09em", textTransform: "uppercase",
-                fontFamily: "'Syne', sans-serif",
-              }}>
-                {icon} {label}
-              </div>
-              <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.75 }}>
-                {text}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.75 }}>{text}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -737,8 +708,6 @@ function SearchPanel({ onAdd, onExplore, onOpenStarterModal, overridesMap, saveO
               );
             })}
           </div>
-
-          <ExplanationSection explanation={result.explanation} />
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 22 }}>
@@ -1214,6 +1183,8 @@ function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverrid
         >×</button>
       </div>
 
+      <ExplanationSection explanation={stock.explanation} />
+
       {/* Price history chart */}
       <PriceHistoryChart symbol={stock.symbol} currency={currency} monthly={monthly} />
 
@@ -1414,7 +1385,6 @@ function ExplorePanel({ stock, onClose, overridesMap, saveOverride, resetOverrid
         </p>
       </div>
 
-      <ExplanationSection explanation={stock.explanation} />
       <DCAExplanation monthly={monthly} annualRate={returns.base} />
     </div>
   );
